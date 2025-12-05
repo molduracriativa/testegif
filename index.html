@@ -21,18 +21,21 @@
         .frame { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
         .stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #111; }
 
-        /* FIX 1: ROTAÇÃO DE 180 GRAUS PARA VIRAR A IMAGEM DE CABEÇA PARA BAIXO (Pré-visualização) */
+        /* FIX: Removendo a ROTAÇÃO de 180deg do CSS para evitar a inversão da pré-visualização. */
+        /* Se o vídeo aparecer deitado, ignore. O Canvas cuidará do salvamento. */
         video {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; 
-            transform: rotate(180deg) scaleX(1); 
+            /* Se o vídeo estiver deitado, remova a linha abaixo e use 'scaleX(1)' */
+            transform: scaleX(1); /* TENTATIVA: REMOVER TODA ROTAÇÃO DE PREVIEW */
+            /* SE A PRÉ-VISUALIZAÇÃO AINDA ESTIVER DEITADA, DEIXE ASSIM. */
             transform-origin: center center;
             background: black; 
             transition: transform 0.3s; 
         }
-        /* Aplica espelhamento E rotação no vídeo frontal */
+        /* Aplica espelhamento apenas no vídeo frontal */
         video.mirrored { 
-            transform: rotate(180deg) scaleX(-1); 
+            transform: scaleX(-1); /* Apenas o espelhamento */
         }
 
         /* Canvas de Preview e Vídeo de Preview (Resultado) NÃO SÃO ROTACIONADOS no CSS. */
@@ -337,8 +340,7 @@
 
         // --- FUNÇÕES DE DESENHO CORRIGIDAS (FIX DE ROTAÇÃO E ALINHAMENTO) ---
 
-        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (Sem rotação de 90 graus)
-        // ESTA FUNÇÃO GARANTE QUE O ARQUIVO FINAL É SALVO CORRETAMENTE NA VERTICAL
+        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (RESTAURAÇÃO: ROTAÇÃO DE 90 GRAUS PARA O ARQUIVO FINAL)
         function drawVideoToCanvas(ctx, w, h, mirrored) {
             const vw = video.videoWidth; 
             const vh = video.videoHeight;
@@ -353,31 +355,33 @@
             // 1. Centraliza o Canvas (Ponto de Rotação)
             ctx.translate(w / 2, h / 2);
             
-            // 2. CORREÇÃO DE ORIENTAÇÃO: Rotacionar 180 graus (para virar de ponta-cabeça)
-            ctx.rotate(Math.PI); // Rotação de 180 graus (meia volta)
+            // 2. Aplica rotação de 90 graus (sentido horário) para corrigir o stream horizontal
+            ctx.rotate(Math.PI / 2); 
 
             // 3. Aplica espelhamento se for a câmera frontal
             if (usingFrontCamera && mirrored) {
                 ctx.scale(-1, 1);
             }
             
-            // 4. CORREÇÃO DE CORTE/ZOOM: Usamos COVER no Canvas.
+            // 4. CORREÇÃO DE CORTE/ZOOM: O Canvas rotacionado tem largura=h e altura=w. Usamos COVER.
+            const rotatedW = h;
+            const rotatedH = w;
             const vidRatio = vw / vh;
             
             let dw, dh;
 
-            // Lógica de 'Cover' (preenchimento total do Canvas)
-            if (vidRatio > (w / h)) { 
-                // Vídeo mais 'largo' que o Canvas. Preenche pela altura.
-                dh = h; 
-                dw = h * vidRatio; 
+            // Lógica de 'Cover' no Canvas Rotacionado
+            if (vidRatio > (rotatedW / rotatedH)) { 
+                // O vídeo é mais 'largo' que o Canvas rotacionado. Preenche pela altura.
+                dh = rotatedH; 
+                dw = rotatedH * vidRatio; 
             } else { 
-                // Vídeo mais 'alto' que o Canvas. Preenche pela largura.
-                dw = w; 
-                dh = w / vidRatio; 
+                // O vídeo é mais 'alto' que o Canvas rotacionado. Preenche pela largura.
+                dw = rotatedW; 
+                dh = rotatedW / vidRatio; 
             }
             
-            // Desenha o vídeo no centro do Canvas
+            // Desenha o vídeo no centro do Canvas rotacionado
             const dx = -dw / 2;
             const dy = -dh / 2;
             
@@ -386,10 +390,11 @@
             // 5. Restaura o Canvas
             ctx.restore();
             
+            // Esta área será usada para posicionar a moldura
             ctx.stageDimensions = { x: 0, y: 0, width: w, height: h };
         }
         
-        // FUNÇÃO DE DESENHO DA MOLDURA (Alinhada no rodapé da área do vídeo)
+        // FUNÇÃO DE DESENHO DA MOLDURA (Corrigida para não distorcer)
         function drawImageLayer(ctx, source, w, h, mode) {
             
             if (mode === 'photo') {
@@ -407,24 +412,21 @@
 
             function drawInternal(ctx, img, w, h) {
                 
-                const videoArea = ctx.stageDimensions;
-                if (!videoArea) return; 
-
-                // Largura da moldura deve cobrir a largura da ÁREA REAL do vídeo
-                const FRAME_WIDTH = videoArea.width; 
+                // 1. Largura da moldura deve ser a largura total do Canvas de saída (ex: 1080)
+                const targetW = w; 
                 
-                // Altura da Moldura proporcional à área do vídeo
-                const MOLDURA_HEIGHT_RATIO = 0.35; 
+                // 2. Calcula a altura proporcional da moldura
+                const imgRatio = img.naturalWidth / img.naturalHeight; // Proporção da moldura (ex: 1080/1920 = 0.5625)
                 
-                const FRAME_HEIGHT = videoArea.height * MOLDURA_HEIGHT_RATIO;
+                // Se a largura for 1080, a altura final é calculada com a proporção original.
+                const targetH = targetW / imgRatio; 
                 
-                // Posição X (começa onde o vídeo começa)
-                const FRAME_X = videoArea.x; 
+                // 3. Posição X e Y
+                const targetX = 0; 
+                const targetY = h - targetH; // Alinha o topo da moldura no final do Canvas
                 
-                // Posição Y (Rodapé da área do vídeo real)
-                const FRAME_Y = videoArea.y + videoArea.height - FRAME_HEIGHT; 
-
-                ctx.drawImage(img, FRAME_X, FRAME_Y, FRAME_WIDTH, FRAME_HEIGHT);
+                // Desenha a imagem (moldura) no tamanho correto, alinhada ao rodapé
+                ctx.drawImage(img, targetX, targetY, targetW, targetH);
             }
         }
         
