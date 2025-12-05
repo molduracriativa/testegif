@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Câmera Customizada - SOLUÇÃO FINAL WEBM</title>
+    <title>Câmera Customizada - SOLUÇÃO WEBM AGRESSIVA</title>
     <style>
         :root {
             --accent: #25D366;
@@ -21,17 +21,17 @@
         .frame { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
         .stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #111; }
 
-        /* FIX CÂMERA: A rotação de 180deg foi removida daqui e movida para o JavaScript */
+        /* CÂMERA */
         #camera {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; 
-            transform: scaleX(1); /* Apenas escala padrão */
+            transform: scaleX(1); 
             transform-origin: center center;
             background: black; 
             transition: transform 0.3s; 
         }
         #camera.mirrored { 
-            transform: scaleX(-1); /* Apenas espelhamento para a frontal */
+            transform: scaleX(-1); /* Espelhamento para a frontal */
         }
 
         /* Canvas de Preview e Vídeo de Preview (Resultado) */
@@ -209,7 +209,7 @@
 
     <script>
         // --- CONFIGURAÇÃO E ESTADOS ---
-        // AGORA APONTA DIRETAMENTE PARA O ARQUIVO WEBM
+        // APONTA DIRETAMENTE PARA O ARQUIVO WEBM
         const MOLDURAS = { 
             'm1': { type: 'video', src: 'molduravideo.webm' }, 
             'm2': { type: 'image', src: 'moldura2.png' } 
@@ -232,7 +232,7 @@
         const canvasPreview = document.getElementById('canvasPreview');
         const ctxPreview = canvasPreview.getContext('2d');
         const canvasFinal = document.getElementById('canvasFinal');
-        const ctxFinal = canvasFinal.getContext('2d', { alpha: false });
+        const ctxFinal = canvasFinal.getContext('2d', { alpha: false }); // Usar alpha:false para gravação de vídeo (melhor performance)
         
         // Elementos de Moldura
         const molduraImagePreview = document.getElementById('molduraImagePreview');
@@ -266,6 +266,7 @@
 
         // --- FUNÇÕES PRINCIPAIS ---
 
+        // FUNÇÃO SET MOLDURA COM LÓGICA DE PLAY AGRESSIVA PARA WEBM
         function setMoldura(btn, key, autoPlay = true) {
             document.querySelectorAll('.frame-selector .btn').forEach(b => b.classList.remove('btn-frame'));
             if(btn) btn.classList.add('btn-frame');
@@ -285,21 +286,28 @@
                 molduraVideoPreview.src = moldura.src;
                 molduraVideoPreview.style.display = 'block';
                 
-                // 3. Força Recarregamento e Tentativa de Play
+                // 3. Força Recarregamento e Tentativa de Play AGRESSIVA
                 if (autoPlay) {
                     molduraVideoPreview.load(); 
-                    molduraVideoPreview.onloadeddata = () => {
-                        molduraVideoPreview.play().catch(e => {
-                            console.log("Play da moldura WebM falhou (onloadeddata):", e);
+                    
+                    // Tenta dar play IMEDIATAMENTE (primeira tentativa).
+                    const playPromise = molduraVideoPreview.play();
+
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            console.log("Play automático do WebM SUCESSO!");
+                        }).catch(error => {
+                            // Se falhar (bloqueio), tenta novamente após um pequeno atraso.
+                            console.log("Play automático do WebM FALHOU. Re-tentando em 500ms...", error);
+                            setTimeout(() => {
+                                molduraVideoPreview.play().catch(e => console.warn("Re-tentativa de Play FALHOU:", e));
+                            }, 500); 
                         });
-                    };
-                    // Tenta play imediatamente (para evitar delay)
-                    molduraVideoPreview.play().catch(e => {
-                        console.log("Play da moldura WebM falhou (imediato):", e);
-                    });
+                    }
                 }
             }
         }
+
 
         function getActiveMolduraElement() {
             if (MOLDURAS[currentMolduraKey].type === 'video') {
@@ -343,14 +351,15 @@
 
             // Se for vídeo animado, garante que o play esteja ativo
             if (MOLDURAS[currentMolduraKey].type === 'video') {
-                molduraVideoPreview.play().catch(e => console.log("Video moldura play failed on record:", e));
+                // Tenta dar play agressivamente novamente se estiver pausado
+                molduraVideoPreview.play().catch(e => console.warn("Video moldura play failed on record:", e));
             }
 
 
             const loop = () => {
                 if (!isRecording) return;
                 
-                // 1. Desenha o Vídeo da Câmera (com correção de rotação)
+                // 1. Desenha o Vídeo da Câmera (com correção de rotação de 180 graus)
                 drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true);
                 
                 // 2. Desenha a Moldura (seja <video> ou <img>)
@@ -367,14 +376,13 @@
                 canvasStream.addTrack(stream.getAudioTracks()[0]); 
             }
             
-            // Tenta usar codecs com melhor compatibilidade (MP4 ou VP9)
-            const preferredMimeTypes = ['video/mp4;codecs=avc1.42001E', 'video/webm;codecs=vp9'];
+            // Tenta usar codecs com melhor compatibilidade (MP4 ou VP9/WEBM). Manteremos o foco no WEBM para transparência.
+            const preferredMimeTypes = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus'];
             let selectedMimeType = preferredMimeTypes.find(type => MediaRecorder.isTypeSupported(type));
 
             if (!selectedMimeType) { selectedMimeType = 'video/webm'; } // Fallback
             
-            const mimeTypeSimple = selectedMimeType.split(';')[0];
-            finalFileExtension = mimeTypeSimple.includes('mp4') ? 'mp4' : 'webm';
+            finalFileExtension = 'webm'; // Garante que o download seja sempre WEBM para preservar o alfa
 
             mediaRecorder = new MediaRecorder(canvasStream, { mimeType: selectedMimeType });
             mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
@@ -399,7 +407,8 @@
         }
 
         function finishVideo() {
-            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+            // O tipo MIME final deve ser 'video/webm' para manter a transparência no arquivo
+            const blob = new Blob(recordedChunks, { type: 'video/webm' }); 
             const videoURL = URL.createObjectURL(blob);
             videoPreview.src = videoURL;
             showResult('video', blob);
@@ -484,6 +493,8 @@
                 const targetX = 0;
                 const targetY = h - targetH; // Ancorar na parte inferior do canvas
                 
+                // IMPORTANTE: Para o WebM, é necessário usar o contexto com transparência 
+                // A gravação em si lidará com isso. Aqui apenas desenhamos.
                 ctx.drawImage(element, targetX, targetY, targetW, targetH);
             }
         }
@@ -516,8 +527,8 @@
             } else { // video
                 canvasPreview.style.display = 'none'; videoPreview.style.display = 'block';
                 url = videoPreview.src;
-                filename = `video_${timestamp}.${finalFileExtension}`;
-                document.getElementById('downloadBtn').innerText = `📥 Baixar Vídeo (.${finalFileExtension})`;
+                filename = `video_${timestamp}.webm`; // Extensão forçada para WEBM
+                document.getElementById('downloadBtn').innerText = `📥 Baixar Vídeo (.webm)`;
             }
 
             currentDownloadData = { blob, filename, url }; // Armazena o URL para revogar
@@ -537,7 +548,7 @@
             activeElement.style.display = 'block';
             if (activeElement.tagName === 'VIDEO') {
                 activeElement.load();
-                activeElement.play().catch(e => console.log("Video moldura play failed on reset:", e));
+                activeElement.play().catch(e => console.warn("Video moldura play failed on reset:", e));
             }
             
             resultUI.style.display = 'none'; cameraUI.style.display = 'flex';
@@ -579,7 +590,8 @@
                 activeElement.style.display = 'block'; 
                 if (activeElement.tagName === 'VIDEO') {
                     activeElement.load(); // Garante que o WebM seja carregado
-                    activeElement.play().catch(e => console.log("Video moldura play failed on start:", e));
+                    // Tenta play agressivamente, pois a interação de start já aconteceu.
+                    activeElement.play().catch(e => console.warn("Video moldura play failed on start:", e));
                 }
 
                 errorMsg.innerText = "";
