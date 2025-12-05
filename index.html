@@ -21,21 +21,18 @@
         .frame { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
         .stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #111; }
 
-        /* FIX: Removendo a ROTAÇÃO de 180deg do CSS para evitar a inversão da pré-visualização. */
-        /* Se o vídeo aparecer deitado, ignore. O Canvas cuidará do salvamento. */
+        /* FIX 1: ROTAÇÃO DE 180 GRAUS NO CSS (PREVIEW) - ESTÁ FUNCIONANDO PARA VOCÊ */
         video {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; 
-            /* Se o vídeo estiver deitado, remova a linha abaixo e use 'scaleX(1)' */
-            transform: scaleX(1); /* TENTATIVA: REMOVER TODA ROTAÇÃO DE PREVIEW */
-            /* SE A PRÉ-VISUALIZAÇÃO AINDA ESTIVER DEITADA, DEIXE ASSIM. */
+            transform: rotate(180deg) scaleX(1); 
             transform-origin: center center;
             background: black; 
             transition: transform 0.3s; 
         }
-        /* Aplica espelhamento apenas no vídeo frontal */
+        /* Aplica espelhamento E rotação no vídeo frontal */
         video.mirrored { 
-            transform: scaleX(-1); /* Apenas o espelhamento */
+            transform: rotate(180deg) scaleX(-1); 
         }
 
         /* Canvas de Preview e Vídeo de Preview (Resultado) NÃO SÃO ROTACIONADOS no CSS. */
@@ -46,10 +43,10 @@
             background: black;
         }
         
-        /* Moldura: Não rotaciona e fica alinhada no rodapé da área vertical */
+        /* FIX 2: MOLDURA - Usar cover para garantir a animação e o desenho no Canvas. */
         #molduraPreview {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            object-fit: contain; 
+            object-fit: cover; /* Alterado para cover */
             object-position: bottom; 
             pointer-events: none;
             z-index: 5;
@@ -340,7 +337,7 @@
 
         // --- FUNÇÕES DE DESENHO CORRIGIDAS (FIX DE ROTAÇÃO E ALINHAMENTO) ---
 
-        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (RESTAURAÇÃO: ROTAÇÃO DE 90 GRAUS PARA O ARQUIVO FINAL)
+        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (FIX FINAL: ROTAÇÃO DE 180 GRAUS)
         function drawVideoToCanvas(ctx, w, h, mirrored) {
             const vw = video.videoWidth; 
             const vh = video.videoHeight;
@@ -349,39 +346,37 @@
             // Limpa o canvas antes de desenhar
             ctx.clearRect(0, 0, w, h);
             
-            // Configura o Canvas para desenhar o vídeo rotacionado
+            // Configura o Canvas para desenhar o vídeo
             ctx.save();
             
             // 1. Centraliza o Canvas (Ponto de Rotação)
             ctx.translate(w / 2, h / 2);
             
-            // 2. Aplica rotação de 90 graus (sentido horário) para corrigir o stream horizontal
-            ctx.rotate(Math.PI / 2); 
+            // 2. CORREÇÃO DE ORIENTAÇÃO: Rotacionar 180 graus (para virar de ponta-cabeça)
+            ctx.rotate(Math.PI); // Rotação de 180 graus (meia volta)
 
             // 3. Aplica espelhamento se for a câmera frontal
             if (usingFrontCamera && mirrored) {
                 ctx.scale(-1, 1);
             }
             
-            // 4. CORREÇÃO DE CORTE/ZOOM: O Canvas rotacionado tem largura=h e altura=w. Usamos COVER.
-            const rotatedW = h;
-            const rotatedH = w;
+            // 4. CORREÇÃO DE CORTE/ZOOM: Usamos COVER no Canvas.
             const vidRatio = vw / vh;
             
             let dw, dh;
 
-            // Lógica de 'Cover' no Canvas Rotacionado
-            if (vidRatio > (rotatedW / rotatedH)) { 
-                // O vídeo é mais 'largo' que o Canvas rotacionado. Preenche pela altura.
-                dh = rotatedH; 
-                dw = rotatedH * vidRatio; 
+            // Lógica de 'Cover' (preenchimento total do Canvas)
+            if (vidRatio > (w / h)) { 
+                // Vídeo mais 'largo' que o Canvas. Preenche pela altura.
+                dh = h; 
+                dw = h * vidRatio; 
             } else { 
-                // O vídeo é mais 'alto' que o Canvas rotacionado. Preenche pela largura.
-                dw = rotatedW; 
-                dh = rotatedW / vidRatio; 
+                // Vídeo mais 'alto' que o Canvas. Preenche pela largura.
+                dw = w; 
+                dh = w / vidRatio; 
             }
             
-            // Desenha o vídeo no centro do Canvas rotacionado
+            // Desenha o vídeo no centro do Canvas
             const dx = -dw / 2;
             const dy = -dh / 2;
             
@@ -390,11 +385,10 @@
             // 5. Restaura o Canvas
             ctx.restore();
             
-            // Esta área será usada para posicionar a moldura
             ctx.stageDimensions = { x: 0, y: 0, width: w, height: h };
         }
         
-        // FUNÇÃO DE DESENHO DA MOLDURA (Corrigida para não distorcer)
+        // FUNÇÃO DE DESENHO DA MOLDURA (Mantida a lógica de proporção)
         function drawImageLayer(ctx, source, w, h, mode) {
             
             if (mode === 'photo') {
@@ -416,7 +410,7 @@
                 const targetW = w; 
                 
                 // 2. Calcula a altura proporcional da moldura
-                const imgRatio = img.naturalWidth / img.naturalHeight; // Proporção da moldura (ex: 1080/1920 = 0.5625)
+                const imgRatio = img.naturalWidth / img.naturalHeight;
                 
                 // Se a largura for 1080, a altura final é calculada com a proporção original.
                 const targetH = targetW / imgRatio; 
@@ -430,7 +424,7 @@
             }
         }
         
-        // --- FUNÇÕES DE UTILIDADE ---
+        // --- FUNÇÕES DE UTILIDADE (Sem alterações) ---
 
         function flashEffect() {
             const f = document.getElementById('flash');
