@@ -350,7 +350,7 @@
             const loop = () => {
                 if (!isRecording) return;
                 
-                // 1. Desenha o Vídeo da Câmera (AGORA COM ROTAÇÃO DE 180)
+                // 1. Desenha o Vídeo da Câmera (COM ROTAÇÃO DE 180 CORRIGIDA)
                 drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true);
                 
                 // 2. Desenha a Moldura
@@ -400,7 +400,7 @@
             showResult('video', blob);
         }
 
-        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (AGORA COM ROTAÇÃO DE 180deg PARA CORRIGIR INVERSÃO)
+        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (COM ROTAÇÃO DE 180deg PARA CORRIGIR INVERSÃO)
         function drawVideoToCanvas(ctx, w, h, mirrored) {
             const vw = video.videoWidth; 
             const vh = video.videoHeight;
@@ -447,12 +447,15 @@
                         drawInternal(ctx, sourceElement, w, h);
                         r();
                     } else {
+                        // Modo foto: forçamos a recarga do PNG para garantir que a imagem não saia vazia
                         const img = new Image(); img.crossOrigin = "anonymous";
                         img.onload = () => { drawInternal(ctx, img, w, h); r(); };
                         img.onerror = r; img.src = sourceElement.src;
                     }
                 });
             } else if (mode === 'video') {
+                // MODO VÍDEO: O elemento DOM JÁ DEVE ESTAR CARREGADO.
+                // Chamamos drawInternal diretamente com o elemento DOM.
                 drawInternal(ctx, sourceElement, w, h);
                 return;
             }
@@ -474,6 +477,7 @@
                 const imgRatio = originalW / originalH;
                 const targetH = targetW / imgRatio;
                 
+                // Lógica para desenhar a moldura no fundo (bottom) e cobrir a largura (cover)
                 const targetX = 0;
                 const targetY = h - targetH; 
                 
@@ -570,6 +574,7 @@
                 const activeElement = getActiveMolduraElement();
                 activeElement.style.display = 'block'; 
                 if (activeElement.tagName === 'VIDEO') {
+                    // Reforçando o load/play do WEBM no sucesso do stream
                     activeElement.load(); 
                     
                     // NOVO LISTENER PARA DEBUG DE ERRO DO ARQUIVO WEBM
