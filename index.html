@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Câmera Customizada - Contained + Vertical</title>
+    <title>Câmera Customizada - Rotação Vertical FIX</title>
     <style>
         :root {
             --accent: #25D366;
@@ -21,26 +21,37 @@
         .frame { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
         .stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #111; }
 
-        /* FIX: Modo 'contain' para mostrar a área total da câmera sem zoom/corte */
-        video, #videoPreview, #canvasPreview {
+        /* FIX 1: Rotacionar o vídeo da CÂMERA para forçar a visualização vertical (9:16) */
+        video {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            object-fit: contain; /* Garante que o vídeo seja contido sem zoom/corte (o que funcionava antes) */
-            background: black; /* Preenche barras pretas, se houver */
-            transform: scaleX(1); /* Remove todas as rotações desnecessárias */
+            object-fit: cover; /* Usa 'cover' para preencher a tela após a rotação */
+            transform: scaleX(1) rotate(-90deg); /* Rotação de -90 graus para orientação correta */
+            transform-origin: center center;
+            background: black; 
+            transition: transform 0.3s; 
+        }
+        /* Aplica espelhamento E rotação apenas no vídeo */
+        video.mirrored { transform: scaleX(-1) rotate(-90deg); }
+
+        /* Canvas de Preview e Vídeo de Preview (Resultado) NÃO SÃO ROTACIONADOS no CSS.
+           Apenas usam CONTAIN para caber na tela. */
+        #canvasPreview, #videoPreview {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            object-fit: contain; /* Mostrar o resultado completo */
+            transform: none; /* Sem rotação CSS */
+            background: black;
         }
         
-        /* Moldura na Pré-visualização */
+        /* Moldura: Não rotaciona e fica alinhada no rodapé da área vertical */
         #molduraPreview {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: contain; 
-            object-position: bottom; /* Alinha a imagem à parte inferior da área contida */
+            object-position: bottom; 
             pointer-events: none;
             z-index: 5;
-            transform: none;
+            transform: none; 
         }
         
-        /* Espelhamento APENAS no vídeo */
-        video.mirrored { transform: scaleX(-1); }
 
         #videoPreview, #canvasPreview { display: none; z-index: 6; background: #000; }
         #canvasFinal { display: none; } 
@@ -238,7 +249,7 @@
             // Definições de alta resolução para foto
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
-            // Desenha o vídeo (com 'contain' para evitar zoom/corte)
+            // Desenha o vídeo (com rotação e correção)
             drawVideoToCanvas(ctxFinal, 1080, 1920, true);
             
             // Desenha a moldura alinhada
@@ -246,6 +257,8 @@
 
             // Prepara a prévia
             canvasPreview.width = stage.clientWidth; canvasPreview.height = stage.clientHeight;
+            // Para a pré-visualização, desenhamos o CanvasFinal (que já está na proporção correta) no CanvasPreview
+            // O CanvasPreview no CSS usa object-fit: contain e não tem rotação, então deve aparecer correto.
             ctxPreview.drawImage(canvasFinal, 0, 0, canvasPreview.width, canvasPreview.height);
 
             canvasFinal.toBlob(blob => {
@@ -262,14 +275,14 @@
             recordingStartTime = Date.now();
             recordedChunks = [];
             
-            // Resolução padrão para vídeo
+            // Resolução padrão para vídeo vertical
             canvasFinal.width = 720; 
             canvasFinal.height = 1280;
 
             const loop = () => {
                 if (!isRecording) return;
                 
-                // 1. Desenha o Vídeo da Câmera (com 'contain' para evitar zoom)
+                // 1. Desenha o Vídeo da Câmera (com correção de rotação)
                 drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true);
                 
                 // 2. Desenha a Moldura/GIF (alinhada à área do vídeo)
@@ -315,40 +328,60 @@
             showResult('video', blob);
         }
 
-        // --- FUNÇÕES DE DESENHO CORRIGIDAS (FIX DE ZOOM/ALINHAMENTO) ---
+        // --- FUNÇÕES DE DESENHO CORRIGIDAS (FIX DE ROTAÇÃO E ALINHAMENTO) ---
 
-        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (Modo 'Contain' para remover zoom)
+        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (Rotaciona o stream para vertical e usa COVER)
         function drawVideoToCanvas(ctx, w, h, mirrored) {
-            const vw = video.videoWidth; const vh = video.videoHeight;
+            const vw = video.videoWidth; 
+            const vh = video.videoHeight;
             if(!vw || !vh) return;
 
-            const vidRatio = vw / vh; const canvasRatio = w / h;
-            let dw, dh, dx, dy;
+            // Limpa o canvas antes de desenhar
+            ctx.clearRect(0, 0, w, h);
+            
+            // Configura o Canvas para desenhar o vídeo rotacionado
+            ctx.save();
+            
+            // 1. Centraliza o Canvas (Ponto de Rotação)
+            ctx.translate(w / 2, h / 2);
+            
+            // 2. Aplica rotação de 90 graus (sentido horário) para corrigir o stream horizontal
+            ctx.rotate(Math.PI / 2); 
 
-            // Lógica de 'Contain' (Mostrar tudo, sem zoom)
-            if (vidRatio > canvasRatio) { 
-                // O vídeo é mais 'largo' que o canvas (ex: 16:9 em tela 9:16). Preenche pela largura.
-                dw = w; dh = w / vidRatio; dx = 0; 
-                dy = (h - dh) / 2; // Centraliza verticalmente (cria barras pretas acima/abaixo)
-            } else { 
-                // O vídeo é mais 'alto' que o canvas (ex: 9:16 em tela 16:9). Preenche pela altura.
-                dh = h; dw = h * vidRatio; dy = 0; 
-                dx = (w - dw) / 2; // Centraliza horizontalmente (cria barras pretas nas laterais)
+            // 3. Aplica espelhamento se for a câmera frontal
+            if (usingFrontCamera && mirrored) {
+                ctx.scale(-1, 1);
             }
             
-            // Armazena as dimensões do VÍDEO REAL dentro do Canvas
-            ctx.stageDimensions = { x: dx, y: dy, width: dw, height: dh };
+            // 4. CORREÇÃO DE CORTE/ZOOM: O Canvas rotacionado tem largura=h e altura=w. Usamos COVER.
+            const rotatedW = h;
+            const rotatedH = w;
+            const vidRatio = vw / vh;
+            
+            let dw, dh;
 
-            // Desenha o vídeo, espelhando se necessário
-            const isFrontCamera = usingFrontCamera;
-            if (isFrontCamera && mirrored) {
-                ctx.save();
-                ctx.scale(-1, 1);
-                ctx.drawImage(video, -dx - dw, dy, dw, dh);
-                ctx.restore();
-            } else {
-                ctx.drawImage(video, dx, dy, dw, dh);
+            // Lógica de 'Cover' no Canvas Rotacionado
+            if (vidRatio > (rotatedW / rotatedH)) { 
+                // O vídeo é mais 'largo' que o Canvas rotacionado. Preenche pela altura.
+                dh = rotatedH; 
+                dw = rotatedH * vidRatio; 
+            } else { 
+                // O vídeo é mais 'alto' que o Canvas rotacionado. Preenche pela largura.
+                dw = rotatedW; 
+                dh = rotatedW / vidRatio; 
             }
+            
+            // Desenha o vídeo no centro do Canvas rotacionado
+            const dx = -dw / 2;
+            const dy = -dh / 2;
+            
+            ctx.drawImage(video, dx, dy, dw, dh);
+            
+            // 5. Restaura o Canvas
+            ctx.restore();
+            
+            // Para a Moldura, a área útil é o Canvas final (720x1280), pois garantimos o COVER.
+            ctx.stageDimensions = { x: 0, y: 0, width: w, height: h };
         }
         
         // FUNÇÃO DE DESENHO DA MOLDURA (Alinhada no rodapé da área do vídeo)
@@ -372,16 +405,16 @@
                 const videoArea = ctx.stageDimensions;
                 if (!videoArea) return; 
 
-                // FIX: Largura da moldura deve cobrir a largura da ÁREA REAL do vídeo
+                // Largura da moldura deve cobrir a largura da ÁREA REAL do vídeo
                 const FRAME_WIDTH = videoArea.width; 
                 
                 // Altura da Moldura proporcional à área do vídeo
-                // 🚨 AJUSTE ESTE VALOR (0.35) para o que for necessário para sua moldura
+                // 🚨 AJUSTE ESTE VALOR (0.35) se precisar de uma moldura mais alta ou mais baixa.
                 const MOLDURA_HEIGHT_RATIO = 0.35; 
                 
                 const FRAME_HEIGHT = videoArea.height * MOLDURA_HEIGHT_RATIO;
                 
-                // Posição X (começa onde o vídeo começa, respeitando o centralizamento)
+                // Posição X (começa onde o vídeo começa)
                 const FRAME_X = videoArea.x; 
                 
                 // Posição Y (Rodapé da área do vídeo real)
