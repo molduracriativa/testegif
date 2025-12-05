@@ -26,22 +26,17 @@
       border-radius: 16px;
     }
 
-    video, canvas {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      top: 0;
-      left: 0;
+    video {
+      display: none; /* video escondido, usamos canvas renderizado */
     }
 
-    #frameOverlay {
+    #renderCanvas, #frameOverlay {
       position: absolute;
       width: 100%;
       height: 100%;
       top: 0;
       left: 0;
-      pointer-events: none;
+      object-fit: cover;
     }
 
     button {
@@ -60,7 +55,7 @@
 
   <div id="preview-container">
     <video id="camera" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
+    <canvas id="renderCanvas"></canvas>
     <img id="frameOverlay" src="moldura.png" />
   </div>
 
@@ -69,44 +64,59 @@
 
   <script>
     const video = document.getElementById("camera");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
+    const renderCanvas = document.getElementById("renderCanvas");
+    const ctx = renderCanvas.getContext("2d");
     const frameOverlay = document.getElementById("frameOverlay");
 
     let stream;
     let recorder;
     let chunks = [];
+    let recording = false;
 
     async function startCamera() {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
       video.srcObject = stream;
+
+      video.onloadedmetadata = () => {
+        renderCanvas.width = video.videoWidth;
+        renderCanvas.height = video.videoHeight;
+        drawLoop();
+      };
+    }
+
+    function drawLoop() {
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, -renderCanvas.width, 0, renderCanvas.width, renderCanvas.height);
+      ctx.restore();
+
+      ctx.drawImage(frameOverlay, 0, 0, renderCanvas.width, renderCanvas.height);
+
+      requestAnimationFrame(drawLoop);
     }
 
     startCamera();
 
     // FOTO
     document.getElementById("btnPhoto").onclick = () => {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      ctx.drawImage(frameOverlay, 0, 0, canvas.width, canvas.height);
-
-      const img = canvas.toDataURL("image/png");
+      const img = renderCanvas.toDataURL("image/png");
       const link = document.createElement("a");
       link.download = "foto_moldura.png";
       link.href = img;
       link.click();
     };
 
-    // VÍDEO
+    // VÍDEO COM MOLDURA APLICADA NO CANVAS
     document.getElementById("btnVideo").onclick = async () => {
-      if (!recorder) {
-        const mixedStream = stream;
-        recorder = new MediaRecorder(mixedStream, { mimeType: "video/webm" });
+      if (!recording) {
+        const canvasStream = renderCanvas.captureStream(30);
+        const audioTrack = stream.getAudioTracks()[0];
+        canvasStream.addTrack(audioTrack);
 
-        recorder.ondataavailable = (e) => chunks.push(e.data);
-        recorder.onstop = async () => {
+        recorder = new MediaRecorder(canvasStream, { mimeType: "video/webm" });
+
+        recorder.ondataavailable = e => chunks.push(e.data);
+        recorder.onstop = () => {
           const blob = new Blob(chunks, { type: "video/webm" });
           const url = URL.createObjectURL(blob);
 
@@ -116,14 +126,15 @@
           a.click();
 
           chunks = [];
-          recorder = null;
         };
 
         recorder.start();
-        alert("Gravação iniciada");
+        recording = true;
+        alert("Gravação iniciada com moldura aplicada!");
       } else {
+        recording = false;
         recorder.stop();
-        alert("Gravação encerrada, salvando...");
+        alert("Gravação finalizada! Salvando...");
       }
     };
   </script>
