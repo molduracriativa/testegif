@@ -21,16 +21,24 @@
         .frame { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
         .stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #111; }
 
-        /* Ajuste para o vídeo e previews */
-        video, #molduraPreview, #videoPreview, #canvasPreview {
+        /* AJUSTE CRÍTICO: Mudar de 'cover' para 'contain' para remover o zoom */
+        video, #videoPreview, #canvasPreview {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            object-fit: cover; /* Garante que o vídeo cubra toda a área */
+            object-fit: contain; /* Garante que o vídeo seja contido sem zoom/corte */
         }
 
+        /* Moldura na Pré-visualização: Mantém proporção e alinha abaixo */
+        #molduraPreview {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            object-fit: contain; /* Mantém proporção e não corta */
+            object-position: bottom; /* Alinha a imagem à parte inferior da área contida */
+            pointer-events: none;
+            z-index: 5;
+        }
+        
         video { transform: scaleX(1); transition: transform 0.3s; }
         video.mirrored { transform: scaleX(-1); }
 
-        #molduraPreview { pointer-events: none; z-index: 5; } 
         #videoPreview, #canvasPreview { display: none; z-index: 6; background: #000; }
         #canvasFinal { display: none; } 
 
@@ -56,19 +64,43 @@
         }
         .btn-frame { border-color: var(--accent); } 
 
-        /* Botão de Captura/Gravação */
-        #captureBtn {
-            width: 80px; height: 80px; border-radius: 50%; border: 4px solid #fff;
-            background: rgba(255,255,255,0.2); cursor: pointer; display: flex;
-            align-items: center; justify-content: center; transition: all 0.2s;
+        /* Controles de Foto/Vídeo Separados */
+        .capture-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
         }
-        #captureBtn:active { transform: scale(0.95); }
-        #captureBtn svg { width: 36px; height: 36px; fill: #fff; }
+        .action-btn-mini {
+            width: 50px; 
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            background: rgba(255, 255, 255, 0.2);
+            font-size: 24px;
+            line-height: 50px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+        .action-btn-large {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 4px solid #fff;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
 
-        /* Estado Gravando */
-        #captureBtn.recording { border-color: var(--record); background: rgba(255, 0, 0, 0.5); }
-        #captureBtn.recording .stop-icon { display: block; width: 30px; height: 30px; background: var(--record); border-radius: 4px; }
-        #captureBtn.recording .cam-icon { display: none; }
+        /* Estado Gravando para o botão de vídeo */
+        .action-btn-large.recording { border-color: var(--record); background: rgba(255, 0, 0, 0.5); }
+        .action-btn-large.recording .stop-icon { display: block; width: 30px; height: 30px; background: var(--record); border-radius: 4px; }
+        .action-btn-large.recording .cam-icon { display: none; }
         .stop-icon { display: none; }
 
         #startScreen {
@@ -92,7 +124,8 @@
     <div class="frame">
         <div class="stage" id="stage">
             <video id="camera" autoplay playsinline muted></video>
-            <canvas id="canvasPreview"></canvas> <canvas id="canvasFinal"></canvas>
+            <canvas id="canvasPreview"></canvas> 
+            <canvas id="canvasFinal"></canvas>
             <video id="videoPreview" playsinline controls></video>
             <img id="molduraPreview" alt="Moldura" src="" style="display: none;" /> 
             <div class="flash" id="flash"></div>
@@ -109,10 +142,15 @@
                         <button class="btn" id="m2Btn">PNG 2</button>
                     </div>
 
-                    <button id="captureBtn">
-                        <svg class="cam-icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zm2.46-7.12l1.41-1.41L12 12.59l2.12-2.12 1.41 1.41L12 15.41l-3.54-3.53z"/></svg>
-                        <div class="stop-icon"></div>
-                    </button>
+                    <div class="capture-controls">
+                        <button id="capturePhotoBtn" class="action-btn-mini">
+                            📷
+                        </button>
+                        <button id="captureVideoBtn" class="action-btn-large">
+                            <svg class="cam-icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zm2.46-7.12l1.41-1.41L12 12.59l2.12-2.12 1.41 1.41L12 15.41l-3.54-3.53z"/></svg>
+                            <div class="stop-icon"></div>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -135,7 +173,6 @@
     <script>
         // --- CONFIGURAÇÃO E ESTADOS ---
         const MOLDURAS = { 'm1': 'molduragif.gif', 'm2': 'moldura2.png' };
-        const LONG_PRESS_THRESHOLD = 300; // ms para diferenciar toque de pressionar
         
         let currentMolduraUrl = MOLDURAS['m1'];
         let usingFrontCamera = true;
@@ -145,9 +182,8 @@
         let recordedChunks = [];
         let recordingStartTime = 0;
         let animationFrameId = null;
-        let captureTimer = null; // Timer para o pressionar e segurar
-        let finalFileExtension = 'webm'; // Padrão
-        let currentDownloadData = { blob: null, filename: null };
+        let finalFileExtension = 'webm';
+        let currentDownloadData = { blob: null, filename: null, url: null };
 
         // --- ELEMENTOS DOM ---
         const video = document.getElementById('camera');
@@ -161,10 +197,11 @@
         const startScreen = document.getElementById('startScreen');
         const cameraUI = document.getElementById('cameraUI');
         const resultUI = document.getElementById('resultUI');
-        const captureBtn = document.getElementById('captureBtn');
         const recordingTimer = document.getElementById('recordingTimer');
         const errorMsg = document.getElementById('errorMsg');
         const downloadBtn = document.getElementById('downloadBtn');
+        const capturePhotoBtn = document.getElementById('capturePhotoBtn'); // Novo
+        const captureVideoBtn = document.getElementById('captureVideoBtn'); // Novo
 
         // --- LISTENERS ---
         setMoldura(document.getElementById('m1Btn'), 'm1');
@@ -174,44 +211,16 @@
         document.getElementById('m1Btn').addEventListener('click', (e) => setMoldura(e.target, 'm1'));
         document.getElementById('m2Btn').addEventListener('click', (e) => setMoldura(e.target, 'm2'));
         
-        // Botão Multifuncional (Foto/Gravação)
-        captureBtn.addEventListener('mousedown', startPress);
-        captureBtn.addEventListener('mouseup', endPress);
-        captureBtn.addEventListener('touchstart', startPress);
-        captureBtn.addEventListener('touchend', endPress);
+        // Botões de Ação Separados
+        capturePhotoBtn.addEventListener('click', takePhoto);
+        captureVideoBtn.addEventListener('click', () => {
+            if (!isRecording) startRecording();
+            else stopRecording();
+        });
         
         downloadBtn.addEventListener('click', triggerDownload);
 
-        // --- FUNÇÕES DE CONTROLE ---
-
-        function startPress(e) {
-            // Previne o menu de contexto em mobile
-            if (e.type === 'touchstart') e.preventDefault(); 
-            
-            if (isRecording) {
-                // Se já estiver gravando, um toque para
-                stopRecording();
-            } else {
-                // Inicia o timer para medir o tempo de pressão
-                captureTimer = setTimeout(() => {
-                    // Se o botão for segurado por tempo suficiente, começa a gravação (vídeo)
-                    startRecording();
-                }, LONG_PRESS_THRESHOLD);
-                captureBtn.classList.add('pressing');
-            }
-        }
-
-        function endPress(e) {
-            if (e.type === 'touchend') e.preventDefault();
-            
-            clearTimeout(captureTimer);
-            
-            // Se o timer não chegou ao fim (pressionar curto) E não está gravando, tira a foto
-            if (captureBtn.classList.contains('pressing') && !isRecording) {
-                takePhoto();
-            }
-            captureBtn.classList.remove('pressing');
-        }
+        // --- FUNÇÕES PRINCIPAIS ---
 
         function setMoldura(btn, key) {
             document.querySelectorAll('.frame-selector .btn').forEach(b => b.classList.remove('btn-frame'));
@@ -226,13 +235,13 @@
             // Definições de alta resolução para foto
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
-            // Desenha o vídeo no canvas final
+            // Desenha o vídeo (com 'contain' para evitar zoom)
             drawVideoToCanvas(ctxFinal, 1080, 1920, true);
             
             // Desenha a moldura alinhada
             await drawImageLayer(ctxFinal, currentMolduraUrl, 1080, 1920, 'photo'); 
 
-            // Prepara a prévia (em baixa resolução da tela)
+            // Prepara a prévia
             canvasPreview.width = stage.clientWidth; canvasPreview.height = stage.clientHeight;
             ctxPreview.drawImage(canvasFinal, 0, 0, canvasPreview.width, canvasPreview.height);
 
@@ -241,13 +250,11 @@
             }, 'image/png');
         }
 
-        // --- FUNÇÕES DE GRAVAÇÃO DE VÍDEO ---
-
         function startRecording() {
             if (isRecording) return; 
 
             isRecording = true;
-            captureBtn.classList.add('recording');
+            captureVideoBtn.classList.add('recording'); // Usando o novo botão de vídeo
             recordingTimer.style.display = 'block';
             recordingStartTime = Date.now();
             recordedChunks = [];
@@ -259,11 +266,10 @@
             const loop = () => {
                 if (!isRecording) return;
                 
-                // 1. Desenha o Vídeo da Câmera
+                // 1. Desenha o Vídeo da Câmera (com 'contain')
                 drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true);
                 
-                // 2. Desenha a Moldura/GIF
-                // 💡 CHAMA A LÓGICA DE POSICIONAMENTO CORRIGIDA PARA GRAVAÇÃO
+                // 2. Desenha a Moldura/GIF (alinhada à área do vídeo)
                 drawImageLayer(ctxFinal, molduraPreview, canvasFinal.width, canvasFinal.height, 'video');
                 
                 updateTimer();
@@ -273,7 +279,7 @@
 
             const canvasStream = canvasFinal.captureStream(30);
             
-            // ... (Lógica de seleção de MimeType e MediaRecorder) ...
+            // Lógica de seleção de MimeType (MP4/WebM)
             const preferredMimeTypes = ['video/mp4;codecs=avc1.42001E', 'video/webm;codecs=vp9'];
             let selectedMimeType = preferredMimeTypes.find(type => MediaRecorder.isTypeSupported(type));
 
@@ -292,7 +298,7 @@
         function stopRecording() {
             if (!isRecording) return;
             isRecording = false;
-            captureBtn.classList.remove('recording');
+            captureVideoBtn.classList.remove('recording'); // Usando o novo botão de vídeo
             cancelAnimationFrame(animationFrameId);
             if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
             recordingTimer.style.display = 'none';
@@ -306,21 +312,30 @@
             showResult('video', blob);
         }
 
-        // --- FUNÇÕES DE DESENHO E POSICIONAMENTO ---
+        // --- FUNÇÕES DE DESENHO CORRIGIDAS ---
 
-        // Altera drawVideoToCanvas para ter um parâmetro de espelhamento
+        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (Modo 'Contain' para remover zoom)
         function drawVideoToCanvas(ctx, w, h, mirrored) {
             const vw = video.videoWidth; const vh = video.videoHeight;
             if(!vw || !vh) return;
+
             const vidRatio = vw / vh; const canvasRatio = w / h;
             let dw, dh, dx, dy;
+
+            // Lógica de 'Contain' (Mostrar tudo, sem zoom)
+            if (vidRatio > canvasRatio) { 
+                dw = w; dh = w / vidRatio; dx = 0; 
+                dy = (h - dh) / 2; // Centraliza verticalmente
+            } else { 
+                dh = h; dw = h * vidRatio; dy = 0; 
+                dx = (w - dw) / 2; // Centraliza horizontalmente
+            }
             
-            // ... (Lógica de Cobrir o Canvas - cover) ...
-            if (vidRatio > canvasRatio) { dh = h; dw = h * vidRatio; dx = (w - dw) / 2; dy = 0; }
-            else { dw = w; dh = w / vidRatio; dx = 0; dy = (h - dh) / 2; }
-            
-            const isFrontCamera = usingFrontCamera; // usa o estado atual da câmera
-            
+            // Armazena as dimensões do VÍDEO REAL dentro do Canvas
+            ctx.stageDimensions = { x: dx, y: dy, width: dw, height: dh };
+
+            // Desenha o vídeo, espelhando se necessário
+            const isFrontCamera = usingFrontCamera;
             if (isFrontCamera && mirrored) {
                 ctx.save();
                 ctx.scale(-1, 1);
@@ -331,40 +346,49 @@
             }
         }
         
-        // 💡 FUNÇÃO MELHORADA PARA POSICIONAR NO CANVAS FINAL (FOTO/VÍDEO)
+        // FUNÇÃO DE DESENHO DA MOLDURA (Alinhada no rodapé da área do vídeo)
         function drawImageLayer(ctx, source, w, h, mode) {
-            // Fonte pode ser a URL da imagem (para foto) ou o elemento molduraPreview (para vídeo)
-            let imgSource = source;
-
+            
             if (mode === 'photo') {
-                // Para foto, carrega uma nova imagem (Promise)
                 return new Promise(r => {
                     const img = new Image(); img.crossOrigin = "anonymous";
                     img.onload = () => { drawInternal(ctx, img, w, h); r(); };
                     img.onerror = r; img.src = source;
                 });
             } else if (mode === 'video') {
-                // Para vídeo, usa o elemento DOM já carregado (não precisa de Promise)
-                if (imgSource.complete) {
-                    drawInternal(ctx, imgSource, w, h);
+                if (source.complete) {
+                    drawInternal(ctx, source, w, h);
                 }
                 return;
             }
 
             function drawInternal(ctx, img, w, h) {
-                // --- AJUSTE DE POSICIONAMENTO PARA COBRIR LARGURA E ALINHAR ABAIXO ---
-                const FRAME_WIDTH = w;
-                const MOLDURA_HEIGHT_RATIO = 0.35; // Altura da moldura (ajuste este valor, ex: 0.35 = 35%)
-                const FRAME_HEIGHT = h * MOLDURA_HEIGHT_RATIO;
-                const FRAME_X = 0; 
-                const FRAME_Y = h - FRAME_HEIGHT; // Alinha na parte inferior
+                
+                const videoArea = ctx.stageDimensions;
+                if (!videoArea) return; 
+
+                // 2. Define a Largura da Moldura para cobrir 100% da Largura do VÍDEO REAL.
+                const FRAME_WIDTH = videoArea.width; 
+                
+                // 3. Define a Proporção de Altura que a moldura deve ocupar na altura do VÍDEO REAL.
+                // 🚨 AJUSTE ESTE VALOR (0.35) para o que for necessário para sua moldura.
+                const MOLDURA_HEIGHT_RATIO = 0.35; 
+                
+                // 4. Calcula a Altura Real da Moldura.
+                const FRAME_HEIGHT = videoArea.height * MOLDURA_HEIGHT_RATIO;
+                
+                // 5. Alinha a Posição X na borda esquerda da área do vídeo.
+                const FRAME_X = videoArea.x; 
+                
+                // 6. Alinha a Posição Y no rodapé da área do vídeo.
+                const FRAME_Y = videoArea.y + videoArea.height - FRAME_HEIGHT; 
 
                 ctx.drawImage(img, FRAME_X, FRAME_Y, FRAME_WIDTH, FRAME_HEIGHT);
             }
         }
         
-        // --- ... (Resto das funções de utilidade e UI) ... ---
-        
+        // --- FUNÇÕES DE UTILIDADE (SEM ALTERAÇÃO) ---
+
         function flashEffect() {
             const f = document.getElementById('flash');
             f.style.opacity = '1'; setTimeout(() => f.style.opacity = '0', 150);
@@ -435,7 +459,7 @@
                 video.play();
                 startScreen.style.display = 'none';
                 cameraUI.style.display = 'flex';
-                molduraPreview.style.display = 'block'; // Mostra a moldura de novo
+                molduraPreview.style.display = 'block'; 
                 errorMsg.innerText = "";
             };
         }
@@ -444,6 +468,13 @@
             if (isRecording) stopRecording();
             usingFrontCamera = !usingFrontCamera;
             await initCamera(true);
+        }
+
+        function updateTimer() {
+            const diff = Math.floor((Date.now() - recordingStartTime) / 1000);
+            const m = Math.floor(diff / 60).toString().padStart(2,'0');
+            const s = (diff % 60).toString().padStart(2,'0');
+            recordingTimer.innerText = `${m}:${s}`;
         }
 
         function triggerDownload() {
