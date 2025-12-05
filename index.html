@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Câmera Customizada - Rotação Vertical FIX + Capa</title>
+    <title>Câmera Customizada - Rotação e Capa FIX</title>
     <style>
         :root {
             --accent: #25D366;
@@ -21,19 +21,18 @@
         .frame { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
         .stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #111; }
 
-        /* FIX 1: Rotacionar o vídeo da CÂMERA para forçar a visualização vertical (9:16) */
+        /* FIX 1: Removendo a ROTAÇÃO de -90deg/90deg no CSS. Apenas espelhamento é mantido. */
         video {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            object-fit: cover; /* Usa 'cover' para preencher a tela após a rotação */
-            /* ROTACAO DE 90DEG PARA CORRIGIR ORIENTAÇÃO NO CHROME/ANDROID */
-            transform: scaleX(1) rotate(90deg); 
+            object-fit: cover; 
+            transform: scaleX(1); /* Rotação removida */
             transform-origin: center center;
             background: black; 
             transition: transform 0.3s; 
         }
-        /* Aplica espelhamento E rotação apenas no vídeo */
+        /* Aplica espelhamento apenas no vídeo frontal */
         video.mirrored { 
-            transform: scaleX(-1) rotate(90deg); 
+            transform: scaleX(-1); /* Apenas o espelhamento */
         }
 
         /* Canvas de Preview e Vídeo de Preview (Resultado) NÃO SÃO ROTACIONADOS no CSS. */
@@ -127,7 +126,7 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             gap: 20px; text-align: center;
             
-            /* COMANDO PARA A CAPA (Nome de arquivo CORRIGIDO) */
+            /* COMANDO PARA A CAPA */
             background-image: url('capajpg.jpg'); 
             background-size: cover; 
             background-position: center; 
@@ -339,6 +338,7 @@
         // --- FUNÇÕES DE DESENHO CORRIGIDAS (FIX DE ROTAÇÃO E ALINHAMENTO) ---
 
         // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (Rotaciona o stream para vertical e usa COVER)
+        // ESTA FUNÇÃO GARANTE QUE O ARQUIVO FINAL É SALVO CORRETAMENTE NA VERTICAL
         function drawVideoToCanvas(ctx, w, h, mirrored) {
             const vw = video.videoWidth; 
             const vh = video.videoHeight;
