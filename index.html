@@ -25,13 +25,16 @@
         video {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; /* Usa 'cover' para preencher a tela após a rotação */
-            transform: scaleX(1) rotate(-90deg); /* Rotação de -90 graus para orientação correta */
+            /* ROTACAO DE 90DEG PARA CORRIGIR ORIENTAÇÃO NO CHROME/ANDROID */
+            transform: scaleX(1) rotate(90deg); 
             transform-origin: center center;
             background: black; 
             transition: transform 0.3s; 
         }
         /* Aplica espelhamento E rotação apenas no vídeo */
-        video.mirrored { transform: scaleX(-1) rotate(-90deg); }
+        video.mirrored { 
+            transform: scaleX(-1) rotate(90deg); 
+        }
 
         /* Canvas de Preview e Vídeo de Preview (Resultado) NÃO SÃO ROTACIONADOS no CSS. */
         #canvasPreview, #videoPreview {
