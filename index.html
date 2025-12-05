@@ -283,6 +283,9 @@
                 molduraVideoPreview.style.display = 'block';
                 
                 if (autoPlay) {
+                    // GARANTIMOS QUE O ELEMENTO ESTÁ MUDO E EM LOOP
+                    molduraVideoPreview.muted = true; 
+                    molduraVideoPreview.loop = true;
                     molduraVideoPreview.load(); 
                     
                     const playPromise = molduraVideoPreview.play();
@@ -292,6 +295,7 @@
                             console.log("Play automático do WebM SUCESSO!");
                         }).catch(error => {
                             console.warn("Play automático do WebM FALHOU. Re-tentando em 500ms...");
+                            // Re-tentativa em caso de erro de promessa de play
                             setTimeout(() => {
                                 molduraVideoPreview.play().catch(e => console.warn("Re-tentativa de Play FALHOU:", e));
                             }, 500); 
@@ -315,7 +319,7 @@
             
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
-            // Desenha a câmera (AGORA COM ROTAÇÃO DE 180)
+            // Desenha a câmera 
             drawVideoToCanvas(ctxFinal, 1080, 1920, true);
             
             // Desenha a moldura 
@@ -343,6 +347,7 @@
             canvasFinal.height = 1280;
 
             if (MOLDURAS[currentMolduraKey].type === 'video') {
+                // Inicia o play do WEBM antes de começar a capturar os frames
                 molduraVideoPreview.play().catch(e => console.warn("Video moldura play failed on record:", e));
             }
 
@@ -389,6 +394,7 @@
             recordingTimer.innerText = "00:00";
             
             if (MOLDURAS[currentMolduraKey].type === 'video') {
+                // Volta o play do WEBM após parar a gravação
                 molduraVideoPreview.play().catch(e => {});
             }
         }
@@ -455,7 +461,7 @@
                 });
             } else if (mode === 'video') {
                 // MODO VÍDEO: O elemento DOM JÁ DEVE ESTAR CARREGADO.
-                // Chamamos drawInternal diretamente com o elemento DOM.
+                // Chamamos drawInternal diretamente com o elemento DOM (seja <video> ou <img>).
                 drawInternal(ctx, sourceElement, w, h);
                 return;
             }
@@ -583,6 +589,9 @@
                         errorMsg.innerText = "ERRO: O arquivo WEBM não pôde ser carregado. Verifique o nome do arquivo (molduravideo.webm).";
                     }, { once: true });
                     
+                    // Tentativa de Play agressiva após carregar o stream principal
+                    activeElement.muted = true;
+                    activeElement.loop = true;
                     activeElement.play().catch(e => console.warn("Video moldura play failed on start:", e));
                 }
 
