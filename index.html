@@ -1,530 +1,131 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Câmera Customizada - Vertical Perfeita</title>
-    <style>
-        :root {
-            --accent: #25D366;
-            --record: #ff0000;
-        }
-        
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moldura Story Vertical</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      color: #fff;
+      font-family: sans-serif;
+    }
 
-        body {
-            margin: 0; background: #000; color: #fff; overflow: hidden;
-            width: 100vw; height: 100dvh;
-            font-family: sans-serif;
-        }
+    #preview-container {
+      position: relative;
+      width: 360px;
+      height: 640px;
+      background: #111;
+      overflow: hidden;
+      border-radius: 16px;
+    }
 
-        .frame { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
-        .stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #111; }
+    video, canvas {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      top: 0;
+      left: 0;
+    }
 
-        /* FIX 1: ROTAÇÃO DO VÍDEO E PREVIEW NO CSS (Visualização vertical) */
-        video, #videoPreview, #canvasPreview {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            transform-origin: center center;
-            background: black; 
-        }
+    #frameOverlay {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
 
-        /* Vídeo da Câmera (Preview em tempo real) */
-        video { 
-            object-fit: cover; /* Usa 'cover' para preencher a tela após a rotação */
-            transform: scaleX(1) rotate(-90deg); 
-            transition: transform 0.3s; 
-        }
-        video.mirrored { transform: scaleX(-1) rotate(-90deg); } 
-
-        /* Preview de Resultado (Foto/Vídeo salvo) - Contém o arquivo, mas rotaciona para vertical */
-        #videoPreview, #canvasPreview {
-            object-fit: contain; /* Usar contain para mostrar a foto/vídeo completo */
-            transform: rotate(0deg); /* Mantenha em 0 deg, o arquivo salvo já deve estar correto */
-        }
-        
-        /* Moldura: Não rotaciona e fica alinhada no rodapé da área vertical */
-        #molduraPreview {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            object-fit: contain; 
-            object-position: bottom; 
-            pointer-events: none;
-            z-index: 5;
-            transform: none; 
-        }
-        
-
-        #videoPreview, #canvasPreview { display: none; z-index: 6; background: #000; }
-        #canvasFinal { display: none; } 
-
-        /* UI Layers */
-        .ui-layer {
-            position: absolute; inset: 0; pointer-events: none; z-index: 20;
-            display: flex; flex-direction: column; justify-content: space-between; padding: 20px;
-        }
-        .top-bar { display: flex; justify-content: space-between; align-items: flex-start; pointer-events: auto; }
-        .timer-badge {
-            background: var(--record); color: white; padding: 5px 12px; border-radius: 12px;
-            font-weight: bold; font-size: 16px; display: none; animation: pulse 1s infinite;
-        }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
-
-        .controls-bottom {
-            display: flex; flex-direction: column; align-items: center; gap: 15px; pointer-events: auto; padding-bottom: 20px;
-        }
-        .btn {
-            padding: 10px 16px; font-size: 14px; font-weight: 600;
-            border: 2px solid rgba(255,255,255,0.3); border-radius: 20px;
-            background: rgba(0, 0, 0, 0.65); color: #fff; cursor: pointer; backdrop-filter: blur(4px);
-        }
-        .btn-frame { border-color: var(--accent); } 
-
-        /* Controles de Foto/Vídeo Separados */
-        .capture-controls {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-        .action-btn-mini {
-            width: 50px; 
-            height: 50px;
-            border-radius: 50%;
-            border: 2px solid #fff;
-            background: rgba(255, 255, 255, 0.2);
-            font-size: 24px;
-            line-height: 50px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #fff;
-        }
-        .action-btn-large {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            border: 4px solid #fff;
-            background: rgba(255, 255, 255, 0.2);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-
-        /* Estado Gravando para o botão de vídeo */
-        .action-btn-large.recording { border-color: var(--record); background: rgba(255, 0, 0, 0.5); }
-        .action-btn-large.recording .stop-icon { display: block; width: 30px; height: 30px; background: var(--record); border-radius: 4px; }
-        .action-btn-large.recording .cam-icon { display: none; }
-        .stop-icon { display: none; }
-
-        #startScreen {
-            position: absolute; inset: 0; background: #000; z-index: 50;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: 20px; text-align: center;
-        }
-        #startBtn { padding: 18px 32px; font-size: 20px; background: #FF5722; color: white; border: none; border-radius: 50px; cursor: pointer; }
-
-        #resultUI .actions {
-            display: none; flex-direction: column; gap: 12px; width: 100%; max-width: 300px; pointer-events: auto;
-        }
-        .action-btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; display: inline-block; }
-        .btn-save { background: var(--accent); color: #fff; }
-        .btn-new { background: #555; color: #fff; }
-        .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 10; transition: opacity 0.1s; }
-    </style>
+    button {
+      margin-top: 16px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      background-color: #ff3d7b;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+    }
+  </style>
 </head>
 <body>
 
-    <div class="frame">
-        <div class="stage" id="stage">
-            <video id="camera" autoplay playsinline muted></video>
-            <canvas id="canvasPreview"></canvas> 
-            <canvas id="canvasFinal"></canvas>
-            <video id="videoPreview" playsinline controls></video>
-            <img id="molduraPreview" alt="Moldura" src="" style="display: none;" /> 
-            <div class="flash" id="flash"></div>
+  <div id="preview-container">
+    <video id="camera" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    <img id="frameOverlay" src="moldura.png" />
+  </div>
 
-            <div class="ui-layer" id="cameraUI" style="display: none;">
-                <div class="top-bar">
-                    <button class="btn" id="switchBtn">🔄 Trocar Câmera</button>
-                    <div id="recordingTimer" class="timer-badge">00:00</div>
-                </div>
+  <button id="btnPhoto">📸 Capturar Foto</button>
+  <button id="btnVideo">🎥 Gravar Vídeo</button>
 
-                <div class="controls-bottom">
-                    <div class="frame-selector">
-                        <button class="btn btn-frame" id="m1Btn">GIF 1</button>
-                        <button class="btn" id="m2Btn">PNG 2</button>
-                    </div>
+  <script>
+    const video = document.getElementById("camera");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const frameOverlay = document.getElementById("frameOverlay");
 
-                    <div class="capture-controls">
-                        <button id="capturePhotoBtn" class="action-btn-mini">
-                            📷
-                        </button>
-                        <button id="captureVideoBtn" class="action-btn-large">
-                            <svg class="cam-icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zm2.46-7.12l1.41-1.41L12 12.59l2.12-2.12 1.41 1.41L12 15.41l-3.54-3.53z"/></svg>
-                            <div class="stop-icon"></div>
-                        </button>
-                    </div>
-                </div>
-            </div>
+    let stream;
+    let recorder;
+    let chunks = [];
 
-            <div class="ui-layer" id="resultUI" style="display: none; justify-content: flex-end; align-items: center;">
-                <div class="actions">
-                    <a id="downloadBtn" class="action-btn btn-save">📥 Baixar Arquivo</a>
-                    <button id="newPhotoBtn" class="action-btn btn-new">🔄 Novo</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    async function startCamera() {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
+      video.srcObject = stream;
+    }
 
-    <div id="startScreen">
-        <h2 style="margin-bottom:0">Configuração de Câmera</h2>
-        <p style="color:#aaa; margin-top:5px">Permita acesso à câmera e microfone para iniciar.</p>
-        <button id="startBtn">INICIAR CÂMERA</button>
-        <p id="errorMsg" style="color:red; font-size:12px; margin-top: 10px;"></p>
-    </div>
+    startCamera();
 
-    <script>
-        // --- CONFIGURAÇÃO E ESTADOS ---
-        const MOLDURAS = { 'm1': 'molduragif.gif', 'm2': 'moldura2.png' };
-        
-        let currentMolduraUrl = MOLDURAS['m1'];
-        let usingFrontCamera = true;
-        let stream = null;
-        let isRecording = false;
-        let mediaRecorder = null;
-        let recordedChunks = [];
-        let recordingStartTime = 0;
-        let animationFrameId = null;
-        let finalFileExtension = 'webm';
-        let currentDownloadData = { blob: null, filename: null, url: null };
+    // FOTO
+    document.getElementById("btnPhoto").onclick = () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
-        // --- ELEMENTOS DOM ---
-        const video = document.getElementById('camera');
-        const videoPreview = document.getElementById('videoPreview');
-        const molduraPreview = document.getElementById('molduraPreview');
-        const canvasPreview = document.getElementById('canvasPreview');
-        const ctxPreview = canvasPreview.getContext('2d');
-        const canvasFinal = document.getElementById('canvasFinal');
-        const ctxFinal = canvasFinal.getContext('2d', { alpha: false });
-        
-        const startScreen = document.getElementById('startScreen');
-        const cameraUI = document.getElementById('cameraUI');
-        const resultUI = document.getElementById('resultUI');
-        const recordingTimer = document.getElementById('recordingTimer');
-        const errorMsg = document.getElementById('errorMsg');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const capturePhotoBtn = document.getElementById('capturePhotoBtn');
-        const captureVideoBtn = document.getElementById('captureVideoBtn');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(frameOverlay, 0, 0, canvas.width, canvas.height);
 
-        // --- LISTENERS ---
-        setMoldura(document.getElementById('m1Btn'), 'm1');
-        document.getElementById('startBtn').addEventListener('click', () => initCamera(true));
-        document.getElementById('switchBtn').addEventListener('click', switchCamera);
-        document.getElementById('newPhotoBtn').addEventListener('click', resetCamera);
-        document.getElementById('m1Btn').addEventListener('click', (e) => setMoldura(e.target, 'm1'));
-        document.getElementById('m2Btn').addEventListener('click', (e) => setMoldura(e.target, 'm2'));
-        
-        // Botões de Ação Separados
-        capturePhotoBtn.addEventListener('click', takePhoto);
-        captureVideoBtn.addEventListener('click', () => {
-            if (!isRecording) startRecording();
-            else stopRecording();
-        });
-        
-        downloadBtn.addEventListener('click', triggerDownload);
+      const img = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.download = "foto_moldura.png";
+      link.href = img;
+      link.click();
+    };
 
-        // --- FUNÇÕES PRINCIPAIS ---
+    // VÍDEO
+    document.getElementById("btnVideo").onclick = async () => {
+      if (!recorder) {
+        const mixedStream = stream;
+        recorder = new MediaRecorder(mixedStream, { mimeType: "video/webm" });
 
-        function setMoldura(btn, key) {
-            document.querySelectorAll('.frame-selector .btn').forEach(b => b.classList.remove('btn-frame'));
-            if(btn) btn.classList.add('btn-frame');
-            currentMolduraUrl = MOLDURAS[key];
-            molduraPreview.src = currentMolduraUrl;
-        }
+        recorder.ondataavailable = (e) => chunks.push(e.data);
+        recorder.onstop = async () => {
+          const blob = new Blob(chunks, { type: "video/webm" });
+          const url = URL.createObjectURL(blob);
 
-        async function takePhoto() {
-            flashEffect();
-            
-            // Definições de alta resolução para foto
-            canvasFinal.width = 1080; canvasFinal.height = 1920;
-            
-            // Desenha o vídeo (com rotação e correção)
-            drawVideoToCanvas(ctxFinal, 1080, 1920, true);
-            
-            // Desenha a moldura alinhada
-            await drawImageLayer(ctxFinal, currentMolduraUrl, 1080, 1920, 'photo'); 
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "video_moldura.webm";
+          a.click();
 
-            // Prepara a prévia
-            canvasPreview.width = stage.clientWidth; canvasPreview.height = stage.clientHeight;
-            ctxPreview.drawImage(canvasFinal, 0, 0, canvasPreview.width, canvasPreview.height);
+          chunks = [];
+          recorder = null;
+        };
 
-            canvasFinal.toBlob(blob => {
-                showResult('image', blob);
-            }, 'image/png');
-        }
-
-        function startRecording() {
-            if (isRecording) return; 
-
-            isRecording = true;
-            captureVideoBtn.classList.add('recording'); 
-            recordingTimer.style.display = 'block';
-            recordingStartTime = Date.now();
-            recordedChunks = [];
-            
-            // Resolução padrão para vídeo vertical
-            canvasFinal.width = 720; 
-            canvasFinal.height = 1280;
-
-            const loop = () => {
-                if (!isRecording) return;
-                
-                // 1. Desenha o Vídeo da Câmera (com correção de rotação)
-                drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true);
-                
-                // 2. Desenha a Moldura/GIF (alinhada à área do vídeo)
-                drawImageLayer(ctxFinal, molduraPreview, canvasFinal.width, canvasFinal.height, 'video');
-                
-                updateTimer();
-                animationFrameId = requestAnimationFrame(loop);
-            };
-            loop();
-
-            const canvasStream = canvasFinal.captureStream(30);
-            
-            // Lógica de seleção de MimeType (MP4/WebM)
-            const preferredMimeTypes = ['video/mp4;codecs=avc1.42001E', 'video/webm;codecs=vp9'];
-            let selectedMimeType = preferredMimeTypes.find(type => MediaRecorder.isTypeSupported(type));
-
-            if (!selectedMimeType) { selectedMimeType = 'video/webm'; }
-            if (stream && stream.getAudioTracks().length > 0) { canvasStream.addTrack(stream.getAudioTracks()[0]); }
-
-            const mimeTypeSimple = selectedMimeType.split(';')[0];
-            finalFileExtension = mimeTypeSimple.includes('mp4') ? 'mp4' : 'webm';
-
-            mediaRecorder = new MediaRecorder(canvasStream, { mimeType: selectedMimeType });
-            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
-            mediaRecorder.onstop = finishVideo;
-            mediaRecorder.start();
-        }
-
-        function stopRecording() {
-            if (!isRecording) return;
-            isRecording = false;
-            captureVideoBtn.classList.remove('recording'); 
-            cancelAnimationFrame(animationFrameId);
-            if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-            recordingTimer.style.display = 'none';
-            recordingTimer.innerText = "00:00";
-        }
-
-        function finishVideo() {
-            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
-            const videoURL = URL.createObjectURL(blob);
-            videoPreview.src = videoURL;
-            showResult('video', blob);
-        }
-
-        // --- FUNÇÕES DE DESENHO CORRIGIDAS (FIX DE ROTAÇÃO E ALINHAMENTO) ---
-
-        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (Rotaciona o stream para vertical e usa COVER)
-        function drawVideoToCanvas(ctx, w, h, mirrored) {
-            const vw = video.videoWidth; 
-            const vh = video.videoHeight;
-            if(!vw || !vh) return;
-
-            // Configura o Canvas para desenhar o vídeo rotacionado
-            ctx.save();
-            
-            // 1. Centraliza o Canvas (Ponto de Rotação)
-            ctx.translate(w / 2, h / 2);
-            
-            // 2. Aplica rotação de 90 graus para corrigir a orientação (horizontal -> vertical)
-            ctx.rotate(Math.PI / 2); 
-
-            // 3. Aplica espelhamento se for a câmera frontal
-            if (usingFrontCamera && mirrored) {
-                ctx.scale(-1, 1);
-            }
-            
-            // 4. CORREÇÃO DE CORTE: Usamos as dimensões invertidas para calcular o COVER.
-            const rotatedW = h;
-            const rotatedH = w;
-            const vidRatio = vw / vh;
-            
-            let dw, dh;
-
-            // Lógica de 'Cover' no Canvas Rotacionado
-            if (vidRatio > (rotatedW / rotatedH)) { 
-                // O vídeo é mais 'largo' que o Canvas rotacionado. Preenche pela altura.
-                dh = rotatedH; 
-                dw = rotatedH * vidRatio; 
-            } else { 
-                // O vídeo é mais 'alto' que o Canvas rotacionado. Preenche pela largura.
-                dw = rotatedW; 
-                dh = rotatedW / vidRatio; 
-            }
-            
-            // Desenha o vídeo no centro do Canvas rotacionado
-            const dx = -dw / 2;
-            const dy = -dh / 2;
-            
-            ctx.drawImage(video, dx, dy, dw, dh);
-            
-            // 5. Restaura o Canvas
-            ctx.restore();
-            
-            // Para a Moldura, a área útil é o Canvas final (720x1280), pois garantimos o COVER.
-            ctx.stageDimensions = { x: 0, y: 0, width: w, height: h };
-        }
-        
-        // FUNÇÃO DE DESENHO DA MOLDURA (Alinhada no rodapé da área do vídeo)
-        function drawImageLayer(ctx, source, w, h, mode) {
-            
-            if (mode === 'photo') {
-                return new Promise(r => {
-                    const img = new Image(); img.crossOrigin = "anonymous";
-                    img.onload = () => { drawInternal(ctx, img, w, h); r(); };
-                    img.onerror = r; img.src = source;
-                });
-            } else if (mode === 'video') {
-                if (source.complete) {
-                    drawInternal(ctx, source, w, h);
-                }
-                return;
-            }
-
-            function drawInternal(ctx, img, w, h) {
-                
-                const videoArea = ctx.stageDimensions;
-                if (!videoArea) return; 
-
-                // 2. Define a Largura da Moldura para cobrir 100% da Largura do VÍDEO REAL.
-                const FRAME_WIDTH = videoArea.width; 
-                
-                // 3. Define a Proporção de Altura que a moldura deve ocupar na altura do VÍDEO REAL.
-                // 🚨 AJUSTE ESTE VALOR (0.35) se precisar de uma moldura mais alta ou mais baixa.
-                const MOLDURA_HEIGHT_RATIO = 0.35; 
-                
-                // 4. Calcula a Altura Real da Moldura.
-                const FRAME_HEIGHT = videoArea.height * MOLDURA_HEIGHT_RATIO;
-                
-                // 5. Alinha a Posição X na borda esquerda da área do vídeo.
-                const FRAME_X = videoArea.x; 
-                
-                // 6. Alinha a Posição Y no rodapé da área do vídeo.
-                const FRAME_Y = videoArea.y + videoArea.height - FRAME_HEIGHT; 
-
-                ctx.drawImage(img, FRAME_X, FRAME_Y, FRAME_WIDTH, FRAME_HEIGHT);
-            }
-        }
-        
-        // --- FUNÇÕES DE UTILIDADE ---
-
-        function flashEffect() {
-            const f = document.getElementById('flash');
-            f.style.opacity = '1'; setTimeout(() => f.style.opacity = '0', 150);
-        }
-
-        function showResult(type, blob = null) {
-            video.style.display = 'none'; molduraPreview.style.display = 'none'; canvasPreview.style.display = 'none'; cameraUI.style.display = 'none';
-            resultUI.style.display = 'flex'; document.querySelector('#resultUI .actions').style.display = 'flex';
-            
-            const timestamp = Date.now();
-            let url = null;
-            let filename = null;
-
-            if (type === 'image') {
-                canvasPreview.style.display = 'block'; videoPreview.style.display = 'none';
-                url = URL.createObjectURL(blob);
-                filename = `foto_${timestamp}.png`;
-                document.getElementById('downloadBtn').innerText = '📥 Baixar Foto (.png)';
-            } else { // video
-                canvasPreview.style.display = 'none'; videoPreview.style.display = 'block';
-                url = videoPreview.src;
-                filename = `video_${timestamp}.${finalFileExtension}`;
-                document.getElementById('downloadBtn').innerText = `📥 Baixar Vídeo (.${finalFileExtension})`;
-            }
-
-            currentDownloadData = { blob, filename };
-            if (url) { currentDownloadData.url = url; } 
-        }
-
-        function resetCamera() {
-            if (currentDownloadData.url && currentDownloadData.url.startsWith('blob:')) { URL.revokeObjectURL(currentDownloadData.url); }
-
-            currentDownloadData = { blob: null, filename: null, url: null };
-            videoPreview.src = ''; videoPreview.style.display = 'none'; videoPreview.pause();
-            canvasPreview.style.display = 'none';
-
-            video.style.display = 'block'; molduraPreview.style.display = 'block'; 
-            resultUI.style.display = 'none'; cameraUI.style.display = 'flex';
-            errorMsg.innerText = "";
-        }
-        
-        async function initCamera(tryAudio = true) {
-            if (stream) { stream.getTracks().forEach(track => track.stop()); stream = null; }
-            errorMsg.innerText = "Solicitando permissões...";
-
-            const currentFacingMode = usingFrontCamera ? 'user' : 'environment';
-            const constraints = {
-                video: { facingMode: currentFacingMode, width: { ideal: 720 }, height: { ideal: 1280 } },
-                audio: tryAudio
-            };
-
-            try {
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-                handleStreamSuccess(stream);
-            } catch (err) {
-                if (tryAudio) { initCamera(false); } else { errorMsg.innerText = "FALHA CRÍTICA! Câmera não pôde ser iniciada."; }
-            }
-        }
-
-        function handleStreamSuccess(newStream) {
-            stream = newStream;
-            video.srcObject = stream;
-            
-            if (usingFrontCamera) video.classList.add('mirrored');
-            else video.classList.remove('mirrored');
-
-            video.onloadedmetadata = () => {
-                video.play();
-                startScreen.style.display = 'none';
-                cameraUI.style.display = 'flex';
-                molduraPreview.style.display = 'block'; 
-                errorMsg.innerText = "";
-            };
-        }
-        
-        async function switchCamera() {
-            if (isRecording) stopRecording();
-            usingFrontCamera = !usingFrontCamera;
-            await initCamera(true);
-        }
-
-        function updateTimer() {
-            const diff = Math.floor((Date.now() - recordingStartTime) / 1000);
-            const m = Math.floor(diff / 60).toString().padStart(2,'0');
-            const s = (diff % 60).toString().padStart(2,'0');
-            recordingTimer.innerText = `${m}:${s}`;
-        }
-
-        function triggerDownload() {
-            const { blob, filename, url } = currentDownloadData;
-            if (!blob || !filename) { alert("Erro: Arquivo não encontrado para download."); return; }
-
-            const downloadUrl = url || URL.createObjectURL(blob);
-            const tempLink = document.createElement('a');
-            tempLink.href = downloadUrl;
-            tempLink.download = filename;
-            
-            document.body.appendChild(tempLink);
-            tempLink.click();
-            document.body.removeChild(tempLink);
-            
-            if (!url) URL.revokeObjectURL(downloadUrl);
-        }
-    </script>
+        recorder.start();
+        alert("Gravação iniciada");
+      } else {
+        recorder.stop();
+        alert("Gravação encerrada, salvando...");
+      }
+    };
+  </script>
 </body>
 </html>
