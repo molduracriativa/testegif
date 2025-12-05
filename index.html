@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Câmera Customizada - FIX CÂMERA E GIF</title>
+    <title>Câmera Customizada - SOLUÇÃO FINAL WEBM</title>
     <style>
         :root {
             --accent: #25D366;
@@ -21,7 +21,7 @@
         .frame { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
         .stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #111; }
 
-        /* CORREÇÃO CSS: REMOVER A ROTAÇÃO DE 180deg DO CSS */
+        /* FIX CÂMERA: A rotação de 180deg foi removida daqui e movida para o JavaScript */
         #camera {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; 
@@ -33,7 +33,6 @@
         #camera.mirrored { 
             transform: scaleX(-1); /* Apenas espelhamento para a frontal */
         }
-        /* FIM CORREÇÃO CSS */
 
         /* Canvas de Preview e Vídeo de Preview (Resultado) */
         #canvasPreview, #videoPreview {
@@ -43,8 +42,8 @@
             background: black;
         }
         
-        /* Moldura de Imagem (Usada para GIF/PNG) */
-        #molduraPreview {
+        /* MOLDURA IMAGEM (para PNG) */
+        #molduraImagePreview {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; 
             object-position: bottom; 
@@ -54,6 +53,16 @@
             display: none;
         }
         
+        /* MOLDURA VÍDEO (para WEBM) */
+        #molduraVideoPreview {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            object-fit: cover; 
+            object-position: bottom; 
+            pointer-events: none;
+            z-index: 5;
+            transform: none; 
+            display: none;
+        }
 
         #videoPreview, #canvasPreview { display: none; z-index: 6; background: #000; }
         #canvasFinal { display: none; } 
@@ -142,8 +151,6 @@
         .btn-new { background: #555; color: #fff; }
         .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 10; transition: opacity 0.1s; }
 
-        /* NOVO CANVAS AUXILIAR INVISÍVEL PARA RENDERIZAR O GIF */
-        #canvasGifRenderer { display: none; }
     </style>
 </head>
 <body>
@@ -155,9 +162,8 @@
             <canvas id="canvasFinal"></canvas>
             <video id="videoPreview" playsinline controls></video>
             
-            <img id="molduraPreview" alt="Moldura" src="" /> 
-            
-            <canvas id="canvasGifRenderer"></canvas>
+            <img id="molduraImagePreview" alt="Moldura Estática" src="" /> 
+            <video id="molduraVideoPreview" autoplay loop muted playsinline alt="Moldura Animada" src=""></video>
 
             <div class="flash" id="flash"></div>
 
@@ -169,7 +175,7 @@
 
                 <div class="controls-bottom">
                     <div class="frame-selector">
-                        <button class="btn btn-frame" id="m1Btn">GIF 1</button>
+                        <button class="btn btn-frame" id="m1Btn">ANIMAÇÃO</button> 
                         <button class="btn" id="m2Btn">PNG 2</button>
                     </div>
 
@@ -203,8 +209,9 @@
 
     <script>
         // --- CONFIGURAÇÃO E ESTADOS ---
+        // AGORA APONTA DIRETAMENTE PARA O ARQUIVO WEBM
         const MOLDURAS = { 
-            'm1': { type: 'gif', src: 'molduragif.gif' }, 
+            'm1': { type: 'video', src: 'molduravideo.webm' }, 
             'm2': { type: 'image', src: 'moldura2.png' } 
         };
         
@@ -216,22 +223,20 @@
         let recordedChunks = [];
         let recordingStartTime = 0;
         let animationFrameId = null;
-        let gifAnimationFrameId = null; 
         let finalFileExtension = 'webm';
         let currentDownloadData = { blob: null, filename: null, url: null };
 
         // --- ELEMENTOS DOM ---
         const video = document.getElementById('camera');
         const videoPreview = document.getElementById('videoPreview');
-        const molduraPreview = document.getElementById('molduraPreview'); 
         const canvasPreview = document.getElementById('canvasPreview');
         const ctxPreview = canvasPreview.getContext('2d');
         const canvasFinal = document.getElementById('canvasFinal');
         const ctxFinal = canvasFinal.getContext('2d', { alpha: false });
         
-        // NOVO ELEMENTO (CANVAS AUXILIAR)
-        const canvasGifRenderer = document.getElementById('canvasGifRenderer');
-        const ctxGifRenderer = canvasGifRenderer.getContext('2d', { alpha: true }); 
+        // Elementos de Moldura
+        const molduraImagePreview = document.getElementById('molduraImagePreview');
+        const molduraVideoPreview = document.getElementById('molduraVideoPreview');
         
         const startScreen = document.getElementById('startScreen');
         const cameraUI = document.getElementById('cameraUI');
@@ -266,12 +271,28 @@
             currentMolduraKey = key;
             const moldura = MOLDURAS[key];
 
-            molduraPreview.src = moldura.src;
-            molduraPreview.style.display = 'block'; 
+            // Esconde os dois
+            molduraImagePreview.style.display = 'none';
+            molduraVideoPreview.style.display = 'none';
+
+            if (moldura.type === 'image') {
+                molduraImagePreview.src = moldura.src;
+                molduraImagePreview.style.display = 'block';
+                molduraVideoPreview.pause(); // Garante que o vídeo está parado
+            } else if (moldura.type === 'video') {
+                molduraVideoPreview.src = moldura.src;
+                molduraVideoPreview.style.display = 'block';
+                // Garante que o vídeo da moldura esteja tocando em loop na prévia
+                molduraVideoPreview.load(); 
+                molduraVideoPreview.play().catch(e => console.log("Video moldura play failed:", e));
+            }
         }
 
-        function getActiveMolduraType() {
-             return MOLDURAS[currentMolduraKey].type;
+        function getActiveMolduraElement() {
+            if (MOLDURAS[currentMolduraKey].type === 'video') {
+                return molduraVideoPreview;
+            }
+            return molduraImagePreview;
         }
 
 
@@ -282,7 +303,8 @@
             
             drawVideoToCanvas(ctxFinal, 1080, 1920, true);
             
-            await drawImageLayer(ctxFinal, molduraPreview, 1080, 1920, 'photo'); 
+            // Desenha a moldura (se for vídeo, captura o frame atual)
+            await drawImageLayer(ctxFinal, getActiveMolduraElement(), 1080, 1920, 'photo'); 
 
             canvasPreview.width = stage.clientWidth; canvasPreview.height = stage.clientHeight;
             ctxPreview.drawImage(canvasFinal, 0, 0, canvasPreview.width, canvasPreview.height);
@@ -304,11 +326,11 @@
             canvasFinal.width = 720; 
             canvasFinal.height = 1280;
 
-            if (getActiveMolduraType() === 'gif') {
-                canvasGifRenderer.width = 720; 
-                canvasGifRenderer.height = 1280; 
-                startGifRenderLoop();
+            // Se for vídeo animado, garante que o play esteja ativo
+            if (MOLDURAS[currentMolduraKey].type === 'video') {
+                molduraVideoPreview.play().catch(e => console.log("Video moldura play failed on record:", e));
             }
+
 
             const loop = () => {
                 if (!isRecording) return;
@@ -316,9 +338,8 @@
                 // 1. Desenha o Vídeo da Câmera (com correção de rotação)
                 drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true);
                 
-                // 2. Desenha a Moldura (usa o canvas auxiliar se for GIF, senão usa a tag <img>)
-                const source = getActiveMolduraType() === 'gif' ? canvasGifRenderer : molduraPreview;
-                drawImageLayer(ctxFinal, source, canvasFinal.width, canvasFinal.height, 'video');
+                // 2. Desenha a Moldura (seja <video> ou <img>)
+                drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'video');
                 
                 updateTimer();
                 animationFrameId = requestAnimationFrame(loop);
@@ -342,44 +363,19 @@
             mediaRecorder.start();
         }
 
-        function startGifRenderLoop() {
-            if (getActiveMolduraType() !== 'gif') return;
-
-            const renderGifFrame = () => {
-                if (!isRecording) return;
-                
-                ctxGifRenderer.clearRect(0, 0, canvasGifRenderer.width, canvasGifRenderer.height);
-                drawInternal(ctxGifRenderer, molduraPreview, canvasGifRenderer.width, canvasGifRenderer.height);
-                
-                gifAnimationFrameId = requestAnimationFrame(renderGifFrame);
-            };
-            renderGifFrame();
-
-            function drawInternal(ctx, img, w, h) {
-                const targetW = w;
-                const imgRatio = img.naturalWidth / img.naturalHeight;
-                const targetH = targetW / imgRatio;
-                const targetX = 0;
-                const targetY = h - targetH;
-                
-                ctx.drawImage(img, targetX, targetY, targetW, targetH);
-            }
-        }
-
         function stopRecording() {
             if (!isRecording) return;
             isRecording = false;
             captureVideoBtn.classList.remove('recording'); 
-            
             cancelAnimationFrame(animationFrameId);
-            if (gifAnimationFrameId) {
-                cancelAnimationFrame(gifAnimationFrameId);
-                gifAnimationFrameId = null;
-            }
-
             if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
             recordingTimer.style.display = 'none';
             recordingTimer.innerText = "00:00";
+            
+            // Pausa a moldura de vídeo para não consumir recursos
+            if (MOLDURAS[currentMolduraKey].type === 'video') {
+                molduraVideoPreview.pause();
+            }
         }
 
         function finishVideo() {
@@ -389,7 +385,7 @@
             showResult('video', blob);
         }
 
-        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (AGORA COM ROTAÇÃO DE VOLTA)
+        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (COM ROTAÇÃO DE 180deg)
         function drawVideoToCanvas(ctx, w, h, mirrored) {
             const vw = video.videoWidth; 
             const vh = video.videoHeight;
@@ -399,7 +395,7 @@
             ctx.save();
             ctx.translate(w / 2, h / 2);
             
-            // ROTAÇÃO DE 180deg RETORNA AQUI PARA CORRIGIR O VÍDEO SALVO
+            // ROTAÇÃO DE 180deg NECESSÁRIA PARA O VÍDEO SALVO
             ctx.rotate(Math.PI); 
 
             if (usingFrontCamera && mirrored) {
@@ -423,26 +419,42 @@
             ctx.stageDimensions = { x: 0, y: 0, width: w, height: h };
         }
         
-        // FUNÇÃO DE DESENHO DA MOLDURA (Sem alterações)
-        function drawImageLayer(ctx, source, w, h, mode) {
+        // FUNÇÃO DE DESENHO DA MOLDURA
+        function drawImageLayer(ctx, sourceElement, w, h, mode) {
             
             if (mode === 'photo') {
+                const isVideo = sourceElement.tagName === 'VIDEO';
+                
                 return new Promise(r => {
-                    const img = new Image(); img.crossOrigin = "anonymous";
-                    img.onload = () => { drawInternal(ctx, img, w, h); r(); };
-                    img.onerror = r; img.src = source.src; 
+                    if (isVideo) {
+                        // Se for moldura de vídeo, desenha o frame atual (para a foto)
+                        drawInternal(ctx, sourceElement, w, h);
+                        r();
+                    } else {
+                        // Se for moldura de imagem (PNG), carrega a imagem
+                        const img = new Image(); img.crossOrigin = "anonymous";
+                        img.onload = () => { drawInternal(ctx, img, w, h); r(); };
+                        img.onerror = r; img.src = sourceElement.src;
+                    }
                 });
             } else if (mode === 'video') {
-                if (source.complete || source.tagName === 'CANVAS') {
-                    drawInternal(ctx, source, w, h);
-                }
+                // Desenha o elemento (vídeo ou imagem) diretamente para a gravação
+                drawInternal(ctx, sourceElement, w, h);
                 return;
             }
 
             function drawInternal(ctx, element, w, h) {
                 
-                const originalW = element.naturalWidth || element.width;
-                const originalH = element.naturalHeight || element.height;
+                let originalW, originalH;
+                if (element.tagName === 'VIDEO') {
+                    originalW = element.videoWidth;
+                    originalH = element.videoHeight;
+                } else { // IMAGEM
+                    originalW = element.naturalWidth || element.width;
+                    originalH = element.naturalHeight || element.height;
+                }
+                
+                if (!originalW || !originalH) return; 
 
                 const targetW = w;
                 const imgRatio = originalW / originalH;
@@ -463,7 +475,12 @@
         }
 
         function showResult(type, blob = null) {
-            video.style.display = 'none'; molduraPreview.style.display = 'none'; canvasPreview.style.display = 'none'; cameraUI.style.display = 'none';
+            video.style.display = 'none'; 
+            molduraImagePreview.style.display = 'none'; 
+            molduraVideoPreview.style.display = 'none';
+            molduraVideoPreview.pause(); 
+            canvasPreview.style.display = 'none'; 
+            cameraUI.style.display = 'none';
             resultUI.style.display = 'flex'; document.querySelector('#resultUI .actions').style.display = 'flex';
             
             const timestamp = Date.now();
@@ -494,7 +511,14 @@
             canvasPreview.style.display = 'none';
 
             video.style.display = 'block'; 
-            molduraPreview.style.display = 'block'; 
+            
+            // Mostra o elemento de moldura ativo
+            const activeElement = getActiveMolduraElement();
+            activeElement.style.display = 'block';
+            if (activeElement.tagName === 'VIDEO') {
+                // Tenta dar play no vídeo ao resetar (para pré-visualização)
+                activeElement.play().catch(e => console.log("Video moldura play failed on reset:", e));
+            }
             
             resultUI.style.display = 'none'; cameraUI.style.display = 'flex';
             errorMsg.innerText = "";
@@ -522,7 +546,6 @@
             stream = newStream;
             video.srcObject = stream;
             
-            // A CLASSE MIRRORED AGORA FAZ APENAS O ESPELHAMENTO HORIZONTAL
             if (usingFrontCamera) video.classList.add('mirrored');
             else video.classList.remove('mirrored');
 
@@ -530,7 +553,14 @@
                 video.play();
                 startScreen.style.display = 'none';
                 cameraUI.style.display = 'flex';
-                molduraPreview.style.display = 'block'; 
+                
+                // Mostra o elemento de moldura ativo
+                const activeElement = getActiveMolduraElement();
+                activeElement.style.display = 'block'; 
+                if (activeElement.tagName === 'VIDEO') {
+                    activeElement.play().catch(e => console.log("Video moldura play failed on start:", e));
+                }
+
                 errorMsg.innerText = "";
             };
         }
