@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Câmera Customizada - FIX GIF</title>
+    <title>Câmera Customizada - FIX CÂMERA E GIF</title>
     <style>
         :root {
             --accent: #25D366;
@@ -21,20 +21,19 @@
         .frame { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
         .stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #111; }
 
-        /* FIX: ROTAÇÃO DE 180 GRAUS NO CSS (PREVIEW) */
+        /* CORREÇÃO CSS: REMOVER A ROTAÇÃO DE 180deg DO CSS */
         #camera {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; 
-            /* A rotação de 180 graus é essencial para corrigir a orientação em alguns celulares */
-            transform: rotate(180deg) scaleX(1); 
+            transform: scaleX(1); /* Apenas escala padrão */
             transform-origin: center center;
             background: black; 
             transition: transform 0.3s; 
         }
         #camera.mirrored { 
-            /* Espelhamento para a câmera frontal */
-            transform: rotate(180deg) scaleX(-1); 
+            transform: scaleX(-1); /* Apenas espelhamento para a frontal */
         }
+        /* FIM CORREÇÃO CSS */
 
         /* Canvas de Preview e Vídeo de Preview (Resultado) */
         #canvasPreview, #videoPreview {
@@ -205,7 +204,7 @@
     <script>
         // --- CONFIGURAÇÃO E ESTADOS ---
         const MOLDURAS = { 
-            'm1': { type: 'gif', src: 'molduragif.gif' }, // VOLTAMOS AO GIF
+            'm1': { type: 'gif', src: 'molduragif.gif' }, 
             'm2': { type: 'image', src: 'moldura2.png' } 
         };
         
@@ -217,14 +216,14 @@
         let recordedChunks = [];
         let recordingStartTime = 0;
         let animationFrameId = null;
-        let gifAnimationFrameId = null; // ID para o loop de animação do GIF
+        let gifAnimationFrameId = null; 
         let finalFileExtension = 'webm';
         let currentDownloadData = { blob: null, filename: null, url: null };
 
         // --- ELEMENTOS DOM ---
         const video = document.getElementById('camera');
         const videoPreview = document.getElementById('videoPreview');
-        const molduraPreview = document.getElementById('molduraPreview'); // Tag <img> do GIF/PNG
+        const molduraPreview = document.getElementById('molduraPreview'); 
         const canvasPreview = document.getElementById('canvasPreview');
         const ctxPreview = canvasPreview.getContext('2d');
         const canvasFinal = document.getElementById('canvasFinal');
@@ -232,7 +231,7 @@
         
         // NOVO ELEMENTO (CANVAS AUXILIAR)
         const canvasGifRenderer = document.getElementById('canvasGifRenderer');
-        const ctxGifRenderer = canvasGifRenderer.getContext('2d', { alpha: true }); // Precisa de transparência!
+        const ctxGifRenderer = canvasGifRenderer.getContext('2d', { alpha: true }); 
         
         const startScreen = document.getElementById('startScreen');
         const cameraUI = document.getElementById('cameraUI');
@@ -251,7 +250,6 @@
         document.getElementById('m1Btn').addEventListener('click', (e) => setMoldura(e.target, 'm1'));
         document.getElementById('m2Btn').addEventListener('click', (e) => setMoldura(e.target, 'm2'));
         
-        // Botões de Ação Separados
         capturePhotoBtn.addEventListener('click', takePhoto);
         captureVideoBtn.addEventListener('click', () => {
             if (!isRecording) startRecording();
@@ -269,7 +267,7 @@
             const moldura = MOLDURAS[key];
 
             molduraPreview.src = moldura.src;
-            molduraPreview.style.display = 'block'; // Manter visível para animação
+            molduraPreview.style.display = 'block'; 
         }
 
         function getActiveMolduraType() {
@@ -280,16 +278,12 @@
         async function takePhoto() {
             flashEffect();
             
-            // Definições de alta resolução para foto
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
-            // Desenha o vídeo (com rotação e correção)
             drawVideoToCanvas(ctxFinal, 1080, 1920, true);
             
-            // Para fotos, ainda usamos o modo "photo" para garantir a captura correta, estática ou não
             await drawImageLayer(ctxFinal, molduraPreview, 1080, 1920, 'photo'); 
 
-            // Prepara a prévia
             canvasPreview.width = stage.clientWidth; canvasPreview.height = stage.clientHeight;
             ctxPreview.drawImage(canvasFinal, 0, 0, canvasPreview.width, canvasPreview.height);
 
@@ -307,13 +301,10 @@
             recordingStartTime = Date.now();
             recordedChunks = [];
             
-            // Resolução padrão para vídeo vertical
             canvasFinal.width = 720; 
             canvasFinal.height = 1280;
 
-            // FIX: Se for GIF, inicia o loop de renderização forçada no Canvas auxiliar
             if (getActiveMolduraType() === 'gif') {
-                // Dimensões do canvas auxiliar (deve ser igual ao canvas final para proporção)
                 canvasGifRenderer.width = 720; 
                 canvasGifRenderer.height = 1280; 
                 startGifRenderLoop();
@@ -336,7 +327,6 @@
 
             const canvasStream = canvasFinal.captureStream(30);
             
-            // Lógica de seleção de MimeType (MP4/WebM)
             const preferredMimeTypes = ['video/mp4;codecs=avc1.42001E', 'video/webm;codecs=vp9'];
             let selectedMimeType = preferredMimeTypes.find(type => MediaRecorder.isTypeSupported(type));
 
@@ -358,17 +348,13 @@
             const renderGifFrame = () => {
                 if (!isRecording) return;
                 
-                // Limpa e redesenha o GIF no canvas auxiliar
                 ctxGifRenderer.clearRect(0, 0, canvasGifRenderer.width, canvasGifRenderer.height);
-                
-                // Desenha a imagem (tag <img>) no canvas auxiliar
                 drawInternal(ctxGifRenderer, molduraPreview, canvasGifRenderer.width, canvasGifRenderer.height);
                 
                 gifAnimationFrameId = requestAnimationFrame(renderGifFrame);
             };
             renderGifFrame();
 
-            // Função de desenho interno da moldura (duplicada para a nova lógica)
             function drawInternal(ctx, img, w, h) {
                 const targetW = w;
                 const imgRatio = img.naturalWidth / img.naturalHeight;
@@ -376,7 +362,6 @@
                 const targetX = 0;
                 const targetY = h - targetH;
                 
-                // Desenha a imagem (moldura) no tamanho correto, alinhada ao rodapé
                 ctx.drawImage(img, targetX, targetY, targetW, targetH);
             }
         }
@@ -386,7 +371,6 @@
             isRecording = false;
             captureVideoBtn.classList.remove('recording'); 
             
-            // Cancela os dois loops de animação
             cancelAnimationFrame(animationFrameId);
             if (gifAnimationFrameId) {
                 cancelAnimationFrame(gifAnimationFrameId);
@@ -405,7 +389,7 @@
             showResult('video', blob);
         }
 
-        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (AGORA CORRIGIDA)
+        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (AGORA COM ROTAÇÃO DE VOLTA)
         function drawVideoToCanvas(ctx, w, h, mirrored) {
             const vw = video.videoWidth; 
             const vh = video.videoHeight;
@@ -414,7 +398,9 @@
             ctx.clearRect(0, 0, w, h);
             ctx.save();
             ctx.translate(w / 2, h / 2);
-            // CORREÇÃO APLICADA: REMOVEMOS ctx.rotate(Math.PI); para fixar a inversão de 180 graus.
+            
+            // ROTAÇÃO DE 180deg RETORNA AQUI PARA CORRIGIR O VÍDEO SALVO
+            ctx.rotate(Math.PI); 
 
             if (usingFrontCamera && mirrored) {
                 ctx.scale(-1, 1);
@@ -437,19 +423,16 @@
             ctx.stageDimensions = { x: 0, y: 0, width: w, height: h };
         }
         
-        // FUNÇÃO DE DESENHO DA MOLDURA (Adaptada para aceitar a tag <img> ou o Canvas auxiliar)
+        // FUNÇÃO DE DESENHO DA MOLDURA (Sem alterações)
         function drawImageLayer(ctx, source, w, h, mode) {
             
             if (mode === 'photo') {
-                // Se for foto, força o carregamento da URL (para garantir a qualidade do PNG)
-                // Se for GIF, pega o estado atual da tag <img>
                 return new Promise(r => {
                     const img = new Image(); img.crossOrigin = "anonymous";
                     img.onload = () => { drawInternal(ctx, img, w, h); r(); };
-                    img.onerror = r; img.src = source.src; // Usa o src da molduraPreview
+                    img.onerror = r; img.src = source.src; 
                 });
             } else if (mode === 'video') {
-                // Se for vídeo, a source pode ser o Canvas auxiliar (GIF) ou a tag <img> (PNG)
                 if (source.complete || source.tagName === 'CANVAS') {
                     drawInternal(ctx, source, w, h);
                 }
@@ -468,7 +451,6 @@
                 const targetX = 0;
                 const targetY = h - targetH; 
                 
-                // Desenha a imagem/canvas no tamanho correto, alinhada ao rodapé
                 ctx.drawImage(element, targetX, targetY, targetW, targetH);
             }
         }
@@ -540,6 +522,7 @@
             stream = newStream;
             video.srcObject = stream;
             
+            // A CLASSE MIRRORED AGORA FAZ APENAS O ESPELHAMENTO HORIZONTAL
             if (usingFrontCamera) video.classList.add('mirrored');
             else video.classList.remove('mirrored');
 
