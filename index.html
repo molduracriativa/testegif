@@ -138,8 +138,8 @@
           <a id="downloadBtn" class="action-btn btn-save">📥 Baixar / Salvar</a>
           <button id="newPhotoBtn" class="action-btn btn-new">🔄 Novo</button>
         </div>
-        </div>
       </div>
+    </div>
   </div>
 
   <div id="startScreen">
@@ -208,7 +208,7 @@
 
     downloadBtn.addEventListener('click', triggerDownload);
     
-    // --- Download Programático Corrigido (Máxima Prioridade) ---
+    // --- Download Programático ---
     function triggerDownload() {
         const { blob, filename } = currentDownloadData;
         
@@ -337,20 +337,19 @@
         canvasFinal.width = 720; 
         canvasFinal.height = 1280;
 
-        // --- Configurações da Posição do GIF (512x512 no canto inferior) ---
-        const GIF_SIZE = 512; 
-        const GIF_W = GIF_SIZE;
-        const GIF_H = GIF_SIZE;
-        const GIF_X = (canvasFinal.width - GIF_W) / 2;
-        const GIF_Y = canvasFinal.height - GIF_H - 50; 
-        // ------------------------------------------------------------------
+        // --- 💡 ATENÇÃO: CONFIGURAÇÃO DE TESTE PARA COBRIR TELA INTEIRA (720x1280) ---
+        const GIF_W = canvasFinal.width; 
+        const GIF_H = canvasFinal.height;
+        const GIF_X = 0;
+        const GIF_Y = 0; 
+        // -----------------------------------------------------------------------------------
 
         const loop = () => {
             if (!isRecording) return;
             
             drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height); 
             
-            // 💡 DESENHA O FRAME ATUAL DO GIF ANIMADO NO CANVAS
+            // DESENHA O FRAME ATUAL DO GIF ANIMADO NO CANVAS
             if(molduraPreview.complete) {
                 ctxFinal.drawImage(molduraPreview, GIF_X, GIF_Y, GIF_W, GIF_H);
             }
@@ -471,7 +470,7 @@
       errorMsg.innerText = "";
     }
     
-    // --- Funções de Gravação e Desenho (Mantidas) ---
+    // --- Funções de Gravação e Desenho ---
 
     function updateTimer() {
         const diff = Math.floor((Date.now() - recordingStartTime) / 1000);
