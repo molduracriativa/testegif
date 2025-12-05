@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Câmera Customizada - SOLUÇÃO FINAL (V2)</title>
+    <title>Câmera Customizada - Versão Final</title>
     <style>
         :root {
             --accent: #25D366;
@@ -315,7 +315,7 @@
             
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
-            // Desenha a câmera (sem rotação de 180 graus fixa)
+            // Desenha a câmera (AGORA COM ROTAÇÃO DE 180)
             drawVideoToCanvas(ctxFinal, 1080, 1920, true);
             
             // Desenha a moldura 
@@ -350,7 +350,7 @@
             const loop = () => {
                 if (!isRecording) return;
                 
-                // 1. Desenha o Vídeo da Câmera (sem rotação de 180 graus fixa)
+                // 1. Desenha o Vídeo da Câmera (AGORA COM ROTAÇÃO DE 180)
                 drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true);
                 
                 // 2. Desenha a Moldura
@@ -400,7 +400,7 @@
             showResult('video', blob);
         }
 
-        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (AGORA SEM A ROTAÇÃO DE 180deg FIXA)
+        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (AGORA COM ROTAÇÃO DE 180deg PARA CORRIGIR INVERSÃO)
         function drawVideoToCanvas(ctx, w, h, mirrored) {
             const vw = video.videoWidth; 
             const vh = video.videoHeight;
@@ -408,9 +408,11 @@
 
             ctx.clearRect(0, 0, w, h);
             ctx.save();
-            ctx.translate(w / 2, h / 2);
             
-            // >>> ROTAÇÃO DE 180 graus REMOVIDA AQUI <<<
+            // --- TRANSFORMAÇÃO PARA CORRIGIR O VÍDEO NO ARQUIVO SALVO ---
+            ctx.translate(w / 2, h / 2); // Move para o centro
+            ctx.rotate(Math.PI); // Rotação de 180 graus
+            // -----------------------------------------------------------
 
             if (usingFrontCamera && mirrored) {
                 // Espelhamento para câmera frontal
@@ -427,6 +429,7 @@
                 dw = w; dh = w / vidRatio; 
             }
             
+            // Desenha a imagem (agora de volta ao centro rotacionado)
             const dx = -dw / 2;
             const dy = -dh / 2;
             
@@ -551,7 +554,7 @@
             }
         }
 
-        // --- FUNÇÃO handleStreamSuccess ATUALIZADA COM DEBUG WEBM ---
+        // FUNÇÃO handleStreamSuccess (COM DEBUG WEBM INCLUÍDO)
         function handleStreamSuccess(newStream) {
             stream = newStream;
             video.srcObject = stream;
