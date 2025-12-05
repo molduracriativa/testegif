@@ -163,7 +163,7 @@
             <video id="videoPreview" playsinline controls></video>
             
             <img id="molduraImagePreview" alt="Moldura Estática" src="" /> 
-            <video id="molduraVideoPreview" autoplay loop muted playsinline alt="Moldura Animada" src=""></video>
+            <video id="molduraVideoPreview" autoplay loop muted playsinline preload="auto" alt="Moldura Animada" src=""></video> 
 
             <div class="flash" id="flash"></div>
 
@@ -248,7 +248,8 @@
         const captureVideoBtn = document.getElementById('captureVideoBtn');
 
         // --- LISTENERS ---
-        setMoldura(document.getElementById('m1Btn'), 'm1');
+        // Inicializa com a moldura 1 (ANIMAÇÃO)
+        setMoldura(document.getElementById('m1Btn'), 'm1', false); // Passa false para não tentar o play antes da câmera
         document.getElementById('startBtn').addEventListener('click', () => initCamera(true));
         document.getElementById('switchBtn').addEventListener('click', switchCamera);
         document.getElementById('newPhotoBtn').addEventListener('click', resetCamera);
@@ -265,26 +266,38 @@
 
         // --- FUNÇÕES PRINCIPAIS ---
 
-        function setMoldura(btn, key) {
+        function setMoldura(btn, key, autoPlay = true) {
             document.querySelectorAll('.frame-selector .btn').forEach(b => b.classList.remove('btn-frame'));
             if(btn) btn.classList.add('btn-frame');
             currentMolduraKey = key;
             const moldura = MOLDURAS[key];
 
-            // Esconde os dois
+            // 1. Esconde os dois
             molduraImagePreview.style.display = 'none';
             molduraVideoPreview.style.display = 'none';
+            molduraVideoPreview.pause(); // Garante que o vídeo anterior pare
 
             if (moldura.type === 'image') {
                 molduraImagePreview.src = moldura.src;
                 molduraImagePreview.style.display = 'block';
-                molduraVideoPreview.pause(); // Garante que o vídeo está parado
             } else if (moldura.type === 'video') {
+                // 2. Configura a moldura de vídeo
                 molduraVideoPreview.src = moldura.src;
                 molduraVideoPreview.style.display = 'block';
-                // Garante que o vídeo da moldura esteja tocando em loop na prévia
-                molduraVideoPreview.load(); 
-                molduraVideoPreview.play().catch(e => console.log("Video moldura play failed:", e));
+                
+                // 3. Força Recarregamento e Tentativa de Play
+                if (autoPlay) {
+                    molduraVideoPreview.load(); 
+                    molduraVideoPreview.onloadeddata = () => {
+                        molduraVideoPreview.play().catch(e => {
+                            console.log("Play da moldura WebM falhou (onloadeddata):", e);
+                        });
+                    };
+                    // Tenta play imediatamente (para evitar delay)
+                    molduraVideoPreview.play().catch(e => {
+                        console.log("Play da moldura WebM falhou (imediato):", e);
+                    });
+                }
             }
         }
 
@@ -301,11 +314,13 @@
             
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
+            // Desenha a câmera (com correção de rotação)
             drawVideoToCanvas(ctxFinal, 1080, 1920, true);
             
             // Desenha a moldura (se for vídeo, captura o frame atual)
             await drawImageLayer(ctxFinal, getActiveMolduraElement(), 1080, 1920, 'photo'); 
 
+            // Preview na tela
             canvasPreview.width = stage.clientWidth; canvasPreview.height = stage.clientHeight;
             ctxPreview.drawImage(canvasFinal, 0, 0, canvasPreview.width, canvasPreview.height);
 
@@ -346,14 +361,18 @@
             };
             loop();
 
+            // Adiciona o áudio (se houver) ao stream do canvas
             const canvasStream = canvasFinal.captureStream(30);
+            if (stream && stream.getAudioTracks().length > 0) { 
+                canvasStream.addTrack(stream.getAudioTracks()[0]); 
+            }
             
+            // Tenta usar codecs com melhor compatibilidade (MP4 ou VP9)
             const preferredMimeTypes = ['video/mp4;codecs=avc1.42001E', 'video/webm;codecs=vp9'];
             let selectedMimeType = preferredMimeTypes.find(type => MediaRecorder.isTypeSupported(type));
 
-            if (!selectedMimeType) { selectedMimeType = 'video/webm'; }
-            if (stream && stream.getAudioTracks().length > 0) { canvasStream.addTrack(stream.getAudioTracks()[0]); }
-
+            if (!selectedMimeType) { selectedMimeType = 'video/webm'; } // Fallback
+            
             const mimeTypeSimple = selectedMimeType.split(';')[0];
             finalFileExtension = mimeTypeSimple.includes('mp4') ? 'mp4' : 'webm';
 
@@ -374,7 +393,8 @@
             
             // Pausa a moldura de vídeo para não consumir recursos
             if (MOLDURAS[currentMolduraKey].type === 'video') {
-                molduraVideoPreview.pause();
+                // Tenta dar play novamente para pré-visualização na tela
+                molduraVideoPreview.play().catch(e => {});
             }
         }
 
@@ -385,7 +405,7 @@
             showResult('video', blob);
         }
 
-        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (COM ROTAÇÃO DE 180deg)
+        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (COM ROTAÇÃO DE 180deg para o resultado final)
         function drawVideoToCanvas(ctx, w, h, mirrored) {
             const vw = video.videoWidth; 
             const vh = video.videoHeight;
@@ -395,16 +415,18 @@
             ctx.save();
             ctx.translate(w / 2, h / 2);
             
-            // ROTAÇÃO DE 180deg NECESSÁRIA PARA O VÍDEO SALVO
+            // ROTAÇÃO DE 180deg NECESSÁRIA PARA O VÍDEO SALVO FICAR NA ORIENTAÇÃO CORRETA
             ctx.rotate(Math.PI); 
 
             if (usingFrontCamera && mirrored) {
+                // Espelhamento para câmera frontal (após a rotação de 180)
                 ctx.scale(-1, 1);
             }
             
             const vidRatio = vw / vh;
             let dw, dh;
 
+            // Lógica de "object-fit: cover" para preencher o canvas
             if (vidRatio > (w / h)) { 
                 dh = h; dw = h * vidRatio; 
             } else { 
@@ -416,7 +438,6 @@
             
             ctx.drawImage(video, dx, dy, dw, dh);
             ctx.restore();
-            ctx.stageDimensions = { x: 0, y: 0, width: w, height: h };
         }
         
         // FUNÇÃO DE DESENHO DA MOLDURA
@@ -461,13 +482,13 @@
                 const targetH = targetW / imgRatio;
                 
                 const targetX = 0;
-                const targetY = h - targetH; 
+                const targetY = h - targetH; // Ancorar na parte inferior do canvas
                 
                 ctx.drawImage(element, targetX, targetY, targetW, targetH);
             }
         }
         
-        // --- FUNÇÕES DE UTILIDADE (Sem alterações) ---
+        // --- FUNÇÕES DE UTILIDADE ---
 
         function flashEffect() {
             const f = document.getElementById('flash');
@@ -499,8 +520,7 @@
                 document.getElementById('downloadBtn').innerText = `📥 Baixar Vídeo (.${finalFileExtension})`;
             }
 
-            currentDownloadData = { blob, filename };
-            if (url) { currentDownloadData.url = url; } 
+            currentDownloadData = { blob, filename, url }; // Armazena o URL para revogar
         }
 
         function resetCamera() {
@@ -512,11 +532,11 @@
 
             video.style.display = 'block'; 
             
-            // Mostra o elemento de moldura ativo
+            // Mostra o elemento de moldura ativo e tenta dar play no vídeo
             const activeElement = getActiveMolduraElement();
             activeElement.style.display = 'block';
             if (activeElement.tagName === 'VIDEO') {
-                // Tenta dar play no vídeo ao resetar (para pré-visualização)
+                activeElement.load();
                 activeElement.play().catch(e => console.log("Video moldura play failed on reset:", e));
             }
             
@@ -554,10 +574,11 @@
                 startScreen.style.display = 'none';
                 cameraUI.style.display = 'flex';
                 
-                // Mostra o elemento de moldura ativo
+                // Mostra o elemento de moldura ativo APÓS a câmera estar pronta
                 const activeElement = getActiveMolduraElement();
                 activeElement.style.display = 'block'; 
                 if (activeElement.tagName === 'VIDEO') {
+                    activeElement.load(); // Garante que o WebM seja carregado
                     activeElement.play().catch(e => console.log("Video moldura play failed on start:", e));
                 }
 
@@ -582,6 +603,7 @@
             const { blob, filename, url } = currentDownloadData;
             if (!blob || !filename) { alert("Erro: Arquivo não encontrado para download."); return; }
 
+            // Usa o URL já criado (blob URL) se disponível
             const downloadUrl = url || URL.createObjectURL(blob);
             const tempLink = document.createElement('a');
             tempLink.href = downloadUrl;
@@ -591,7 +613,8 @@
             tempLink.click();
             document.body.removeChild(tempLink);
             
-            if (!url) URL.revokeObjectURL(downloadUrl);
+            // Revogar o URL se não foi feito em 'resetCamera'
+            if (!url && downloadUrl.startsWith('blob:')) URL.revokeObjectURL(downloadUrl);
         }
     </script>
 </body>
