@@ -337,7 +337,7 @@
 
         // --- FUNÇÕES DE DESENHO CORRIGIDAS (FIX DE ROTAÇÃO E ALINHAMENTO) ---
 
-        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (Rotaciona o stream para vertical e usa COVER)
+        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (Sem rotação de 90 graus)
         // ESTA FUNÇÃO GARANTE QUE O ARQUIVO FINAL É SALVO CORRETAMENTE NA VERTICAL
         function drawVideoToCanvas(ctx, w, h, mirrored) {
             const vw = video.videoWidth; 
@@ -353,33 +353,31 @@
             // 1. Centraliza o Canvas (Ponto de Rotação)
             ctx.translate(w / 2, h / 2);
             
-            // 2. Aplica rotação de 90 graus (sentido horário) para corrigir o stream horizontal
-            ctx.rotate(Math.PI / 2); 
+            // 2. CORREÇÃO DE ORIENTAÇÃO: Rotacionar 180 graus (para virar de ponta-cabeça)
+            ctx.rotate(Math.PI); // Rotação de 180 graus (meia volta)
 
             // 3. Aplica espelhamento se for a câmera frontal
             if (usingFrontCamera && mirrored) {
                 ctx.scale(-1, 1);
             }
             
-            // 4. CORREÇÃO DE CORTE/ZOOM: O Canvas rotacionado tem largura=h e altura=w. Usamos COVER.
-            const rotatedW = h;
-            const rotatedH = w;
+            // 4. CORREÇÃO DE CORTE/ZOOM: Usamos COVER no Canvas.
             const vidRatio = vw / vh;
             
             let dw, dh;
 
-            // Lógica de 'Cover' no Canvas Rotacionado
-            if (vidRatio > (rotatedW / rotatedH)) { 
-                // O vídeo é mais 'largo' que o Canvas rotacionado. Preenche pela altura.
-                dh = rotatedH; 
-                dw = rotatedH * vidRatio; 
+            // Lógica de 'Cover' (preenchimento total do Canvas)
+            if (vidRatio > (w / h)) { 
+                // Vídeo mais 'largo' que o Canvas. Preenche pela altura.
+                dh = h; 
+                dw = h * vidRatio; 
             } else { 
-                // O vídeo é mais 'alto' que o Canvas rotacionado. Preenche pela largura.
-                dw = rotatedW; 
-                dh = rotatedW / vidRatio; 
+                // Vídeo mais 'alto' que o Canvas. Preenche pela largura.
+                dw = w; 
+                dh = w / vidRatio; 
             }
             
-            // Desenha o vídeo no centro do Canvas rotacionado
+            // Desenha o vídeo no centro do Canvas
             const dx = -dw / 2;
             const dy = -dh / 2;
             
@@ -388,7 +386,6 @@
             // 5. Restaura o Canvas
             ctx.restore();
             
-            // Para a Moldura, a área útil é o Canvas final (720x1280), pois garantimos o COVER.
             ctx.stageDimensions = { x: 0, y: 0, width: w, height: h };
         }
         
