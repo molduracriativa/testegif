@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Câmera Customizada - Foto e Vídeo com GIF</title>
+    <title>Câmera Customizada - Vertical com GIF</title>
     <style>
         :root {
             --accent: #25D366;
@@ -21,24 +21,28 @@
         .frame { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
         .stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #111; }
 
-        /* CORREÇÃO DO ZOOM: Modo 'contain' para mostrar a área total da câmera */
+        /* FIX 1: Rotacionar o vídeo para forçar a visualização vertical (9:16) */
         video, #videoPreview, #canvasPreview {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            object-fit: contain; 
-            background: black; /* Preenche barras pretas, se houver */
+            object-fit: cover; /* Usa 'cover' para preencher a área após a rotação */
+            transform: rotate(-90deg); /* Rotação de -90 graus para orientação correta */
+            transform-origin: center center;
+            background: black; 
         }
 
-        /* Moldura na Pré-visualização: Mantém proporção e alinha abaixo */
+        /* FIX 2: Moldura e Vídeo Preview não podem ser rotacionados, mas devem estar na posição vertical */
         #molduraPreview {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: contain; 
-            object-position: bottom; /* Alinha a imagem à parte inferior da área contida */
+            object-position: bottom; 
             pointer-events: none;
             z-index: 5;
+            transform: none; /* Garante que a moldura NUNCA seja rotacionada */
         }
         
-        video { transform: scaleX(1); transition: transform 0.3s; }
-        video.mirrored { transform: scaleX(-1); }
+        /* Aplica espelhamento E rotação apenas no vídeo */
+        video { transform: scaleX(1) rotate(-90deg); transition: transform 0.3s; }
+        video.mirrored { transform: scaleX(-1) rotate(-90deg); } 
 
         #videoPreview, #canvasPreview { display: none; z-index: 6; background: #000; }
         #canvasFinal { display: none; } 
@@ -236,7 +240,7 @@
             // Definições de alta resolução para foto
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
-            // Desenha o vídeo (com 'contain' para evitar zoom)
+            // Desenha o vídeo (com rotação e correção)
             drawVideoToCanvas(ctxFinal, 1080, 1920, true);
             
             // Desenha a moldura alinhada
@@ -260,14 +264,14 @@
             recordingStartTime = Date.now();
             recordedChunks = [];
             
-            // Resolução padrão para vídeo
+            // Resolução padrão para vídeo vertical
             canvasFinal.width = 720; 
             canvasFinal.height = 1280;
 
             const loop = () => {
                 if (!isRecording) return;
                 
-                // 1. Desenha o Vídeo da Câmera (com 'contain')
+                // 1. Desenha o Vídeo da Câmera (com correção de rotação)
                 drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true);
                 
                 // 2. Desenha a Moldura/GIF (alinhada à área do vídeo)
@@ -313,38 +317,53 @@
             showResult('video', blob);
         }
 
-        // --- FUNÇÕES DE DESENHO CORRIGIDAS (FIX DE ZOOM/ALINHAMENTO) ---
+        // --- FUNÇÕES DE DESENHO CORRIGIDAS (FIX DE ROTAÇÃO E ALINHAMENTO) ---
 
-        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (Modo 'Contain' para remover zoom)
+        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (Rotaciona o stream para vertical)
         function drawVideoToCanvas(ctx, w, h, mirrored) {
-            const vw = video.videoWidth; const vh = video.videoHeight;
+            const vw = video.videoWidth; 
+            const vh = video.videoHeight;
             if(!vw || !vh) return;
 
-            const vidRatio = vw / vh; const canvasRatio = w / h;
-            let dw, dh, dx, dy;
+            // Configura o Canvas para desenhar o vídeo rotacionado
+            ctx.save();
+            
+            // 1. Centraliza o Canvas (Ponto de Rotação)
+            ctx.translate(w / 2, h / 2);
+            
+            // 2. Aplica rotação de 90 graus para corrigir a orientação (se o stream for lateralizado)
+            ctx.rotate(Math.PI / 2); 
 
-            // Lógica de 'Contain' (Mostrar tudo, sem zoom)
-            if (vidRatio > canvasRatio) { 
-                dw = w; dh = w / vidRatio; dx = 0; 
-                dy = (h - dh) / 2; // Centraliza verticalmente
-            } else { 
-                dh = h; dw = h * vidRatio; dy = 0; 
-                dx = (w - dw) / 2; // Centraliza horizontalmente
+            // 3. Aplica espelhamento se for a câmera frontal
+            if (usingFrontCamera && mirrored) {
+                ctx.scale(-1, 1);
             }
             
-            // Armazena as dimensões do VÍDEO REAL dentro do Canvas
-            ctx.stageDimensions = { x: dx, y: dy, width: dw, height: dh };
+            // 4. Calcula o desenho em modo 'cover' (ocupa 100% da área rotacionada)
+            const rotatedCanvasW = h;
+            const rotatedCanvasH = w;
+            const vidRatio = vw / vh;
+            
+            let dw, dh;
 
-            // Desenha o vídeo, espelhando se necessário
-            const isFrontCamera = usingFrontCamera;
-            if (isFrontCamera && mirrored) {
-                ctx.save();
-                ctx.scale(-1, 1);
-                ctx.drawImage(video, -dx - dw, dy, dw, dh);
-                ctx.restore();
-            } else {
-                ctx.drawImage(video, dx, dy, dw, dh);
+            // Lógica de 'Cover' no Canvas Rotacionado
+            if (vidRatio > (rotatedCanvasW / rotatedCanvasH)) { 
+                dh = rotatedCanvasH; dw = rotatedCanvasH * vidRatio; 
+            } else { 
+                dw = rotatedCanvasW; dh = rotatedCanvasW / vidRatio; 
             }
+            
+            // Desenha o vídeo no centro do Canvas rotacionado
+            const dx = -dw / 2;
+            const dy = -dh / 2;
+            
+            ctx.drawImage(video, dx, dy, dw, dh);
+            
+            // 5. Restaura o Canvas
+            ctx.restore();
+            
+            // Para a Moldura, salvamos as dimensões da área do vídeo (que agora é o Canvas todo, vertical)
+            ctx.stageDimensions = { x: 0, y: 0, width: w, height: h };
         }
         
         // FUNÇÃO DE DESENHO DA MOLDURA (Alinhada no rodapé da área do vídeo)
@@ -372,7 +391,7 @@
                 const FRAME_WIDTH = videoArea.width; 
                 
                 // 3. Define a Proporção de Altura que a moldura deve ocupar na altura do VÍDEO REAL.
-                // 🚨 AJUSTE ESTE VALOR (0.35) para o que for necessário para sua moldura (0.35 = 35% da altura da área do vídeo).
+                // 🚨 AJUSTE ESTE VALOR (0.35) se precisar de uma moldura mais alta ou mais baixa.
                 const MOLDURA_HEIGHT_RATIO = 0.35; 
                 
                 // 4. Calcula a Altura Real da Moldura.
