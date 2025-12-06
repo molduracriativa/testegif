@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Câmera Customizada - Sequência PNG</title>
+    <title>Câmera Customizada - GIF Animado</title>
     <style>
         :root {
             --accent: #25D366;
@@ -42,7 +42,7 @@
             background: black;
         }
         
-        /* MOLDURA IMAGEM (Usada para PNG estático e Sequência PNG) */
+        /* MOLDURA IMAGEM (Usada para PNG estático e GIF) */
         #molduraImagePreview {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; 
@@ -53,7 +53,7 @@
             display: none;
         }
         
-        /* MOLDURA VÍDEO (Elemento de vídeo não mais usado para a animação de sequência) */
+        /* MOLDURA VÍDEO (Não usado) */
         #molduraVideoPreview {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; 
@@ -162,7 +162,7 @@
             <canvas id="canvasFinal"></canvas>
             <video id="videoPreview" playsinline controls></video>
             
-            <img id="molduraImagePreview" alt="Moldura Estática/Sequência" src="" /> 
+            <img id="molduraImagePreview" alt="Moldura Estática/GIF" src="" /> 
             <video id="molduraVideoPreview" autoplay loop muted playsinline preload="auto" alt="Moldura Animada" src=""></video> 
 
             <div class="flash" id="flash"></div>
@@ -175,7 +175,7 @@
 
                 <div class="controls-bottom">
                     <div class="frame-selector">
-                        <button class="btn btn-frame" id="m1Btn">ANIMAÇÃO</button> 
+                        <button class="btn btn-frame" id="m1Btn">ANIMAÇÃO (GIF)</button> 
                         <button class="btn" id="m2Btn">PNG 2</button>
                     </div>
 
@@ -208,15 +208,12 @@
     </div>
 
     <script>
-        // --- CONFIGURAÇÃO E ESTADOS CORRIGIDOS ---
+        // --- CONFIGURAÇÃO E ESTADOS: VOLTANDO PARA GIF ---
         const MOLDURAS = { 
+            // CONFIGURAÇÃO PARA USAR O ARQUIVO GIF
             'm1': { 
-                type: 'sequence', 
-                // CORRIGIDO: Caminho base e prefixo dos seus arquivos (molduragif_00000.png)
-                baseSrc: 'moldura_animada/molduragif_', 
-                // CORRIGIDO: Total de frames (00000 a 00024 = 25 frames)
-                count: 25, 
-                fps: 15 
+                type: 'image', // Tipo 'image' aceita GIF animado
+                src: 'molduragif.gif' // Nome do seu arquivo GIF
             }, 
             'm2': { type: 'image', src: 'moldura2.png' } 
         };
@@ -232,12 +229,7 @@
         let finalFileExtension = 'webm';
         let currentDownloadData = { blob: null, filename: null, url: null };
 
-        // --- VARIÁVEIS PARA A SEQUÊNCIA PNG ---
-        let animationFrames = []; 
-        let currentFrameIndex = 0;
-        let animationInterval = null; 
-        let animationLoaded = false;
-        // ------------------------------------
+        // --- VARIÁVEIS DE SEQUÊNCIA REMOVIDAS, POIS NÃO SÃO MAIS NECESSÁRIAS ---
 
         // --- ELEMENTOS DOM ---
         const video = document.getElementById('camera');
@@ -276,68 +268,8 @@
         
         downloadBtn.addEventListener('click', triggerDownload);
 
-        // --- FUNÇÕES DE ANIMAÇÃO DE SEQUÊNCIA PNG ---
+        // --- FUNÇÕES DE ANIMAÇÃO REMOVIDAS (o navegador cuida do loop do GIF) ---
 
-        function stopAnimation() {
-            if (animationInterval) {
-                clearInterval(animationInterval);
-                animationInterval = null;
-            }
-        }
-        
-        function startAnimationLoop(intervalTime) {
-            stopAnimation(); // Garante que apenas um loop esteja ativo
-            const molduraElement = getActiveMolduraElement();
-
-            animationInterval = setInterval(() => {
-                currentFrameIndex++;
-                if (currentFrameIndex >= animationFrames.length) {
-                    currentFrameIndex = 0; // Volta para o primeiro frame (loop)
-                }
-                
-                // Atualiza a imagem na tela de preview
-                molduraElement.src = animationFrames[currentFrameIndex].src;
-            }, intervalTime);
-        }
-
-        // CORRIGIDO: Função para pré-carregar os frames e iniciar o loop
-        function loadAndStartSequence(moldura) {
-            if (animationLoaded) {
-                 startAnimationLoop(1000 / moldura.fps);
-                 return;
-            }
-            
-            const totalFrames = moldura.count;
-            const frameRate = moldura.fps || 15;
-            const intervalTime = 1000 / frameRate; 
-
-            // 1. Limpa o estado anterior
-            stopAnimation();
-            animationFrames = [];
-            currentFrameIndex = 0;
-
-            // 2. Pré-carrega todas as imagens
-            let loadedCount = 0;
-            // Loop CORRIGIDO: Começa em 0 e vai até < totalFrames (25)
-            for (let i = 0; i < totalFrames; i++) {
-                const frame = new Image();
-                
-                // Formata o número do frame com 5 dígitos (ex: 0 -> 00000)
-                const frameNumber = String(i).padStart(5, '0'); 
-                frame.src = moldura.baseSrc + frameNumber + '.png';
-                
-                frame.onload = () => {
-                    loadedCount++;
-                    if (loadedCount === totalFrames) {
-                        animationLoaded = true;
-                        // Define o primeiro frame na tela de preview e inicia o loop
-                        getActiveMolduraElement().src = animationFrames[0].src; 
-                        startAnimationLoop(intervalTime);
-                    }
-                };
-                animationFrames.push(frame);
-            }
-        }
 
         // --- FUNÇÕES PRINCIPAIS ---
 
@@ -347,25 +279,20 @@
             currentMolduraKey = key;
             const moldura = MOLDURAS[key];
 
-            // Limpa e esconde todos os elementos
+            // Limpa e esconde o elemento de vídeo, já que o GIF usa o elemento de imagem
             molduraImagePreview.style.display = 'none';
             molduraVideoPreview.style.display = 'none';
-            stopAnimation(); 
 
+            // LÓGICA DE MOLDURA DE IMAGEM (Inclui GIF)
             if (moldura.type === 'image') {
-                // PNG ESTÁTICO
                 molduraImagePreview.src = moldura.src;
                 molduraImagePreview.style.display = 'block';
-            } else if (moldura.type === 'sequence') {
-                // SEQUÊNCIA PNG
-                molduraImagePreview.style.display = 'block';
-                loadAndStartSequence(moldura);
             }
         }
 
 
         function getActiveMolduraElement() {
-            // A animação de sequência e o PNG estático usam o mesmo elemento <img>
+            // O GIF animado usa o elemento <img>
             return molduraImagePreview;
         }
 
@@ -375,10 +302,10 @@
             
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
-            // Desenha a câmera
+            // Desenha a câmera (CORREÇÃO DE ROTAÇÃO INCLUÍDA)
             drawVideoToCanvas(ctxFinal, 1080, 1920, true);
             
-            // Desenha a moldura (pegará o frame atual da animação, se m1 estiver selecionado)
+            // Desenha a moldura (pegará o frame ATUAL do GIF)
             await drawImageLayer(ctxFinal, getActiveMolduraElement(), 1080, 1920, 'photo'); 
 
             // Preview na tela
@@ -402,31 +329,15 @@
             canvasFinal.width = 720; 
             canvasFinal.height = 1280;
 
-            const moldura = MOLDURAS[currentMolduraKey];
-            if (moldura.type === 'sequence') {
-                 // Reinicia a animação para garantir que comece no frame 0
-                currentFrameIndex = -1;
-            }
-
-
+            // O loop agora só desenha o GIF e a câmera, sem a complexidade da Sequência PNG
             const loop = () => {
                 if (!isRecording) return;
                 
                 // 1. Desenha o Vídeo da Câmera (COM ROTAÇÃO DE 180 CORRIGIDA)
                 drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true);
                 
-                // 2. Se for sequência PNG, avança o frame ANTES de desenhar
-                if (moldura.type === 'sequence' && animationLoaded) {
-                    currentFrameIndex++;
-                    if (currentFrameIndex >= animationFrames.length) {
-                        currentFrameIndex = 0; 
-                    }
-                    // Usa o objeto Image do array 'animationFrames' como fonte
-                    drawImageLayer(ctxFinal, animationFrames[currentFrameIndex], canvasFinal.width, canvasFinal.height, 'video');
-                } else {
-                    // Desenha o PNG Estático 
-                    drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'video');
-                }
+                // 2. Desenha a Moldura (GIF)
+                drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'video');
                 
                 updateTimer();
                 animationFrameId = requestAnimationFrame(loop);
@@ -459,12 +370,6 @@
             if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
             recordingTimer.style.display = 'none';
             recordingTimer.innerText = "00:00";
-            
-            // Retorna o loop de preview da animação, se for o caso
-            const moldura = MOLDURAS[currentMolduraKey];
-            if (moldura.type === 'sequence' && animationLoaded) {
-                 startAnimationLoop(1000 / moldura.fps);
-            }
         }
 
         function finishVideo() {
@@ -520,7 +425,7 @@
                     if (isVideoElement) {
                         r();
                     } else {
-                        // Modo foto: desenha o elemento Image ou o frame atual da Sequência
+                        // Modo foto: desenha o elemento Image ou o frame atual do GIF
                         drawInternal(ctx, sourceElement, w, h); r();
                     }
                 });
@@ -537,7 +442,7 @@
                     originalW = element.videoWidth;
                     originalH = element.videoHeight;
                 } else { 
-                    // Usa naturalWidth/naturalHeight para PNG/IMG (incluindo os frames da sequência)
+                    // Usa naturalWidth/naturalHeight para PNG/GIF
                     originalW = element.naturalWidth || element.width;
                     originalH = element.naturalHeight || element.height;
                 }
@@ -564,8 +469,7 @@
         }
 
         function showResult(type, blob = null) {
-            // Para a animação do preview
-            stopAnimation();
+            // Se o GIF estava animando, o navegador já cuida da pausa
             
             video.style.display = 'none'; 
             molduraImagePreview.style.display = 'none'; 
@@ -603,14 +507,9 @@
 
             video.style.display = 'block'; 
             
-            // Retorna a moldura ativa (e o loop de animação, se for o caso)
+            // Retorna a moldura ativa (o GIF continuará animando automaticamente)
             const activeElement = getActiveMolduraElement();
             activeElement.style.display = 'block';
-            
-            const moldura = MOLDURAS[currentMolduraKey];
-            if (moldura.type === 'sequence' && animationLoaded) {
-                 startAnimationLoop(1000 / moldura.fps);
-            }
             
             resultUI.style.display = 'none'; cameraUI.style.display = 'flex';
             errorMsg.innerText = "";
@@ -646,7 +545,7 @@
                 startScreen.style.display = 'none';
                 cameraUI.style.display = 'flex';
                 
-                // Inicia a moldura ativa, incluindo o loop de sequência, se for o caso
+                // Inicia a moldura ativa (GIF)
                 setMoldura(document.getElementById('m1Btn'), currentMolduraKey, true);
 
                 errorMsg.innerText = "";
