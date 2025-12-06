@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Câmera Customizada - Versão Final</title>
+    <title>Câmera Customizada - Sequência PNG</title>
     <style>
         :root {
             --accent: #25D366;
@@ -42,7 +42,7 @@
             background: black;
         }
         
-        /* MOLDURA IMAGEM (para PNG) */
+        /* MOLDURA IMAGEM (Usada para PNG estático e Sequência PNG) */
         #molduraImagePreview {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; 
@@ -53,7 +53,7 @@
             display: none;
         }
         
-        /* MOLDURA VÍDEO (para WEBM) */
+        /* MOLDURA VÍDEO (Elemento de vídeo não mais usado para a animação de sequência) */
         #molduraVideoPreview {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; 
@@ -162,7 +162,7 @@
             <canvas id="canvasFinal"></canvas>
             <video id="videoPreview" playsinline controls></video>
             
-            <img id="molduraImagePreview" alt="Moldura Estática" src="" /> 
+            <img id="molduraImagePreview" alt="Moldura Estática/Sequência" src="" /> 
             <video id="molduraVideoPreview" autoplay loop muted playsinline preload="auto" alt="Moldura Animada" src=""></video> 
 
             <div class="flash" id="flash"></div>
@@ -208,9 +208,16 @@
     </div>
 
     <script>
-        // --- CONFIGURAÇÃO E ESTADOS ---
+        // --- CONFIGURAÇÃO E ESTADOS CORRIGIDOS ---
         const MOLDURAS = { 
-            'm1': { type: 'video', src: 'molduravideo.webm' }, 
+            'm1': { 
+                type: 'sequence', 
+                // CORRIGIDO: Caminho base e prefixo dos seus arquivos (molduragif_00000.png)
+                baseSrc: 'moldura_animada/molduragif_', 
+                // CORRIGIDO: Total de frames (00000 a 00024 = 25 frames)
+                count: 25, 
+                fps: 15 
+            }, 
             'm2': { type: 'image', src: 'moldura2.png' } 
         };
         
@@ -225,6 +232,13 @@
         let finalFileExtension = 'webm';
         let currentDownloadData = { blob: null, filename: null, url: null };
 
+        // --- VARIÁVEIS PARA A SEQUÊNCIA PNG ---
+        let animationFrames = []; 
+        let currentFrameIndex = 0;
+        let animationInterval = null; 
+        let animationLoaded = false;
+        // ------------------------------------
+
         // --- ELEMENTOS DOM ---
         const video = document.getElementById('camera');
         const videoPreview = document.getElementById('videoPreview');
@@ -235,7 +249,7 @@
         
         // Elementos de Moldura
         const molduraImagePreview = document.getElementById('molduraImagePreview');
-        const molduraVideoPreview = document.getElementById('molduraVideoPreview');
+        const molduraVideoPreview = document.getElementById('molduraVideoPreview'); 
         
         const startScreen = document.getElementById('startScreen');
         const cameraUI = document.getElementById('cameraUI');
@@ -262,54 +276,96 @@
         
         downloadBtn.addEventListener('click', triggerDownload);
 
+        // --- FUNÇÕES DE ANIMAÇÃO DE SEQUÊNCIA PNG ---
+
+        function stopAnimation() {
+            if (animationInterval) {
+                clearInterval(animationInterval);
+                animationInterval = null;
+            }
+        }
+        
+        function startAnimationLoop(intervalTime) {
+            stopAnimation(); // Garante que apenas um loop esteja ativo
+            const molduraElement = getActiveMolduraElement();
+
+            animationInterval = setInterval(() => {
+                currentFrameIndex++;
+                if (currentFrameIndex >= animationFrames.length) {
+                    currentFrameIndex = 0; // Volta para o primeiro frame (loop)
+                }
+                
+                // Atualiza a imagem na tela de preview
+                molduraElement.src = animationFrames[currentFrameIndex].src;
+            }, intervalTime);
+        }
+
+        // CORRIGIDO: Função para pré-carregar os frames e iniciar o loop
+        function loadAndStartSequence(moldura) {
+            if (animationLoaded) {
+                 startAnimationLoop(1000 / moldura.fps);
+                 return;
+            }
+            
+            const totalFrames = moldura.count;
+            const frameRate = moldura.fps || 15;
+            const intervalTime = 1000 / frameRate; 
+
+            // 1. Limpa o estado anterior
+            stopAnimation();
+            animationFrames = [];
+            currentFrameIndex = 0;
+
+            // 2. Pré-carrega todas as imagens
+            let loadedCount = 0;
+            // Loop CORRIGIDO: Começa em 0 e vai até < totalFrames (25)
+            for (let i = 0; i < totalFrames; i++) {
+                const frame = new Image();
+                
+                // Formata o número do frame com 5 dígitos (ex: 0 -> 00000)
+                const frameNumber = String(i).padStart(5, '0'); 
+                frame.src = moldura.baseSrc + frameNumber + '.png';
+                
+                frame.onload = () => {
+                    loadedCount++;
+                    if (loadedCount === totalFrames) {
+                        animationLoaded = true;
+                        // Define o primeiro frame na tela de preview e inicia o loop
+                        getActiveMolduraElement().src = animationFrames[0].src; 
+                        startAnimationLoop(intervalTime);
+                    }
+                };
+                animationFrames.push(frame);
+            }
+        }
+
         // --- FUNÇÕES PRINCIPAIS ---
 
-        // FUNÇÃO SET MOLDURA COM LÓGICA DE PLAY AGRESSIVA PARA WEBM
         function setMoldura(btn, key, autoPlay = true) {
             document.querySelectorAll('.frame-selector .btn').forEach(b => b.classList.remove('btn-frame'));
             if(btn) btn.classList.add('btn-frame');
             currentMolduraKey = key;
             const moldura = MOLDURAS[key];
 
+            // Limpa e esconde todos os elementos
             molduraImagePreview.style.display = 'none';
             molduraVideoPreview.style.display = 'none';
-            molduraVideoPreview.pause(); 
+            stopAnimation(); 
 
             if (moldura.type === 'image') {
+                // PNG ESTÁTICO
                 molduraImagePreview.src = moldura.src;
                 molduraImagePreview.style.display = 'block';
-            } else if (moldura.type === 'video') {
-                molduraVideoPreview.src = moldura.src;
-                molduraVideoPreview.style.display = 'block';
-                
-                if (autoPlay) {
-                    // GARANTIMOS QUE O ELEMENTO ESTÁ MUDO E EM LOOP
-                    molduraVideoPreview.muted = true; 
-                    molduraVideoPreview.loop = true;
-                    molduraVideoPreview.load(); 
-                    
-                    const playPromise = molduraVideoPreview.play();
-
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => {
-                            console.log("Play automático do WebM SUCESSO!");
-                        }).catch(error => {
-                            console.warn("Play automático do WebM FALHOU. Re-tentando em 500ms...");
-                            // Re-tentativa em caso de erro de promessa de play
-                            setTimeout(() => {
-                                molduraVideoPreview.play().catch(e => console.warn("Re-tentativa de Play FALHOU:", e));
-                            }, 500); 
-                        });
-                    }
-                }
+            } else if (moldura.type === 'sequence') {
+                // SEQUÊNCIA PNG
+                molduraImagePreview.style.display = 'block';
+                loadAndStartSequence(moldura);
             }
         }
 
 
         function getActiveMolduraElement() {
-            if (MOLDURAS[currentMolduraKey].type === 'video') {
-                return molduraVideoPreview;
-            }
+            // A animação de sequência e o PNG estático usam o mesmo elemento <img>
             return molduraImagePreview;
         }
 
@@ -319,10 +375,10 @@
             
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
-            // Desenha a câmera 
+            // Desenha a câmera
             drawVideoToCanvas(ctxFinal, 1080, 1920, true);
             
-            // Desenha a moldura 
+            // Desenha a moldura (pegará o frame atual da animação, se m1 estiver selecionado)
             await drawImageLayer(ctxFinal, getActiveMolduraElement(), 1080, 1920, 'photo'); 
 
             // Preview na tela
@@ -346,9 +402,10 @@
             canvasFinal.width = 720; 
             canvasFinal.height = 1280;
 
-            if (MOLDURAS[currentMolduraKey].type === 'video') {
-                // Inicia o play do WEBM antes de começar a capturar os frames
-                molduraVideoPreview.play().catch(e => console.warn("Video moldura play failed on record:", e));
+            const moldura = MOLDURAS[currentMolduraKey];
+            if (moldura.type === 'sequence') {
+                 // Reinicia a animação para garantir que comece no frame 0
+                currentFrameIndex = -1;
             }
 
 
@@ -358,8 +415,18 @@
                 // 1. Desenha o Vídeo da Câmera (COM ROTAÇÃO DE 180 CORRIGIDA)
                 drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true);
                 
-                // 2. Desenha a Moldura
-                drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'video');
+                // 2. Se for sequência PNG, avança o frame ANTES de desenhar
+                if (moldura.type === 'sequence' && animationLoaded) {
+                    currentFrameIndex++;
+                    if (currentFrameIndex >= animationFrames.length) {
+                        currentFrameIndex = 0; 
+                    }
+                    // Usa o objeto Image do array 'animationFrames' como fonte
+                    drawImageLayer(ctxFinal, animationFrames[currentFrameIndex], canvasFinal.width, canvasFinal.height, 'video');
+                } else {
+                    // Desenha o PNG Estático 
+                    drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'video');
+                }
                 
                 updateTimer();
                 animationFrameId = requestAnimationFrame(loop);
@@ -393,9 +460,10 @@
             recordingTimer.style.display = 'none';
             recordingTimer.innerText = "00:00";
             
-            if (MOLDURAS[currentMolduraKey].type === 'video') {
-                // Volta o play do WEBM após parar a gravação
-                molduraVideoPreview.play().catch(e => {});
+            // Retorna o loop de preview da animação, se for o caso
+            const moldura = MOLDURAS[currentMolduraKey];
+            if (moldura.type === 'sequence' && animationLoaded) {
+                 startAnimationLoop(1000 / moldura.fps);
             }
         }
 
@@ -445,23 +513,19 @@
         
         function drawImageLayer(ctx, sourceElement, w, h, mode) {
             
+            const isVideoElement = sourceElement.tagName === 'VIDEO';
+            
             if (mode === 'photo') {
-                const isVideo = sourceElement.tagName === 'VIDEO';
-                
                 return new Promise(r => {
-                    if (isVideo) {
-                        drawInternal(ctx, sourceElement, w, h);
+                    if (isVideoElement) {
                         r();
                     } else {
-                        // Modo foto: forçamos a recarga do PNG para garantir que a imagem não saia vazia
-                        const img = new Image(); img.crossOrigin = "anonymous";
-                        img.onload = () => { drawInternal(ctx, img, w, h); r(); };
-                        img.onerror = r; img.src = sourceElement.src;
+                        // Modo foto: desenha o elemento Image ou o frame atual da Sequência
+                        drawInternal(ctx, sourceElement, w, h); r();
                     }
                 });
             } else if (mode === 'video') {
-                // MODO VÍDEO: O elemento DOM JÁ DEVE ESTAR CARREGADO.
-                // Chamamos drawInternal diretamente com o elemento DOM (seja <video> ou <img>).
+                // MODO VÍDEO: Chamamos drawInternal diretamente com o elemento
                 drawInternal(ctx, sourceElement, w, h);
                 return;
             }
@@ -473,6 +537,7 @@
                     originalW = element.videoWidth;
                     originalH = element.videoHeight;
                 } else { 
+                    // Usa naturalWidth/naturalHeight para PNG/IMG (incluindo os frames da sequência)
                     originalW = element.naturalWidth || element.width;
                     originalH = element.naturalHeight || element.height;
                 }
@@ -499,10 +564,13 @@
         }
 
         function showResult(type, blob = null) {
+            // Para a animação do preview
+            stopAnimation();
+            
             video.style.display = 'none'; 
             molduraImagePreview.style.display = 'none'; 
             molduraVideoPreview.style.display = 'none';
-            molduraVideoPreview.pause(); 
+            videoPreview.pause(); 
             canvasPreview.style.display = 'none'; 
             cameraUI.style.display = 'none';
             resultUI.style.display = 'flex'; document.querySelector('#resultUI .actions').style.display = 'flex';
@@ -535,11 +603,13 @@
 
             video.style.display = 'block'; 
             
+            // Retorna a moldura ativa (e o loop de animação, se for o caso)
             const activeElement = getActiveMolduraElement();
             activeElement.style.display = 'block';
-            if (activeElement.tagName === 'VIDEO') {
-                activeElement.load();
-                activeElement.play().catch(e => console.warn("Video moldura play failed on reset:", e));
+            
+            const moldura = MOLDURAS[currentMolduraKey];
+            if (moldura.type === 'sequence' && animationLoaded) {
+                 startAnimationLoop(1000 / moldura.fps);
             }
             
             resultUI.style.display = 'none'; cameraUI.style.display = 'flex';
@@ -564,7 +634,6 @@
             }
         }
 
-        // FUNÇÃO handleStreamSuccess (COM DEBUG WEBM INCLUÍDO)
         function handleStreamSuccess(newStream) {
             stream = newStream;
             video.srcObject = stream;
@@ -577,23 +646,8 @@
                 startScreen.style.display = 'none';
                 cameraUI.style.display = 'flex';
                 
-                const activeElement = getActiveMolduraElement();
-                activeElement.style.display = 'block'; 
-                if (activeElement.tagName === 'VIDEO') {
-                    // Reforçando o load/play do WEBM no sucesso do stream
-                    activeElement.load(); 
-                    
-                    // NOVO LISTENER PARA DEBUG DE ERRO DO ARQUIVO WEBM
-                    activeElement.addEventListener('error', (e) => {
-                        console.error("ERRO ao carregar o WebM:", e);
-                        errorMsg.innerText = "ERRO: O arquivo WEBM não pôde ser carregado. Verifique o nome do arquivo (molduravideo.webm).";
-                    }, { once: true });
-                    
-                    // Tentativa de Play agressiva após carregar o stream principal
-                    activeElement.muted = true;
-                    activeElement.loop = true;
-                    activeElement.play().catch(e => console.warn("Video moldura play failed on start:", e));
-                }
+                // Inicia a moldura ativa, incluindo o loop de sequência, se for o caso
+                setMoldura(document.getElementById('m1Btn'), currentMolduraKey, true);
 
                 errorMsg.innerText = "";
             };
