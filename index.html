@@ -171,7 +171,11 @@
             <video id="videoPreview" playsinline controls></video>
             
             <img id="molduraImagePreview" alt="Moldura Estática" src="" /> 
-            <video id="molduraVideoPreview" autoplay loop muted playsinline preload="auto" alt="Moldura Animada" src="molduravideo.webm"></video> 
+            
+            <video id="molduraVideoPreview" autoplay loop muted playsinline preload="auto" alt="Moldura Animada" data-src="molduravideo.webm" style="display: none;">
+                <source src="molduravideo.webm" type="video/webm">
+                Seu navegador não suporta a moldura de vídeo.
+            </video> 
 
             <div class="flash" id="flash"></div>
 
@@ -218,12 +222,10 @@
     <script>
         // --- CONFIGURAÇÃO E ESTADOS ---
         const MOLDURAS = { 
-            // MOLDURA WEBM
             'm1': { 
                 type: 'video', 
                 src: 'molduravideo.webm' 
             }, 
-            // MOLDURA PNG ESTÁTICA
             'm2': { type: 'image', src: 'moldura2.png' } 
         };
         
@@ -246,7 +248,6 @@
         const canvasFinal = document.getElementById('canvasFinal');
         const ctxFinal = canvasFinal.getContext('2d', { alpha: false }); 
         
-        // Elementos de Moldura
         const molduraImagePreview = document.getElementById('molduraImagePreview');
         const molduraVideoPreview = document.getElementById('molduraVideoPreview'); 
         
@@ -270,9 +271,8 @@
         document.getElementById('m1Btn').addEventListener('click', (e) => setMoldura(e.target, 'm1'));
         document.getElementById('m2Btn').addEventListener('click', (e) => setMoldura(e.target, 'm2'));
         
-        // CORREÇÃO: Listener de foto simplificado para garantir que a função takePhoto() seja chamada
+        // CORREÇÃO: Listener de foto garantido (função síncrona)
         capturePhotoBtn.addEventListener('click', () => {
-            // Garante que o evento de clique não seja bloqueado
              takePhoto(); 
         });
         
@@ -301,13 +301,20 @@
                 molduraImagePreview.src = moldura.src;
                 molduraImagePreview.style.display = 'block';
             } else if (moldura.type === 'video') {
-                // CORREÇÃO: Força o display: block e tenta iniciar o play
+                // CORREÇÃO: Força o carregamento e tenta iniciar a reprodução
+                
+                // Garante que o src seja definido e carregado (importante para navegadores móveis)
+                if (!molduraVideoPreview.src || molduraVideoPreview.src.indexOf('molduravideo.webm') === -1) {
+                    molduraVideoPreview.src = moldura.src;
+                    molduraVideoPreview.load(); 
+                }
+                
                 molduraVideoPreview.style.display = 'block';
                 if (autoPlay) {
                      molduraVideoPreview.currentTime = 0; 
-                     // Promise para tentar iniciar a reprodução. Autoplay pode ser bloqueado pelo browser.
+                     // Tenta dar play, ignorando o erro de autoplay bloqueado
                      molduraVideoPreview.play().catch(e => {
-                         console.warn("Autoplay da moldura de vídeo bloqueado. O usuário deve interagir com a tela.", e);
+                         console.warn("Autoplay da moldura de vídeo bloqueado.", e);
                      });
                 }
             }
@@ -319,19 +326,17 @@
             return moldura.type === 'image' ? molduraImagePreview : molduraVideoPreview;
         }
 
-        // Função de foto agora é síncrona, esperando a Promise dentro dela
-        async function takePhoto() {
+        // Função takePhoto agora é síncrona (não usa 'async')
+        function takePhoto() { 
             flashEffect();
             
-            // Define o tamanho final do arquivo (Retrato)
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
-            // 1. Desenha a câmera (Com correção de espelhamento)
+            // 1. Desenha a câmera 
             drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true); 
             
-            // 2. Desenha a moldura 
-            // O "await" garante que o frame da moldura de vídeo seja capturado antes de finalizar o canvas
-            await drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'photo'); 
+            // 2. Desenha a moldura (chamada síncrona)
+            drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'photo'); 
 
             // Preview na tela
             canvasPreview.width = stage.clientWidth; canvasPreview.height = stage.clientHeight;
@@ -351,24 +356,19 @@
             recordingStartTime = Date.now();
             recordedChunks = [];
             
-            // Define o tamanho final do arquivo de vídeo (Retrato)
             canvasFinal.width = 720; 
             canvasFinal.height = 1280;
             
-            // Inicia a moldura de vídeo (tentativa)
             const moldura = MOLDURAS[currentMolduraKey];
             if (moldura.type === 'video') {
                 molduraVideoPreview.play().catch(e => { /* ignore */ });
             }
 
-            // Loop principal de gravação (desenha vídeo + moldura a cada frame)
             const loop = () => {
                 if (!isRecording) return;
                 
-                // 1. Desenha o Vídeo da Câmera (Com correção de espelhamento)
                 drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true); 
                 
-                // 2. Desenha a Moldura 
                 drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'video');
                 
                 updateTimer();
@@ -376,7 +376,6 @@
             };
             loop();
 
-            // Configura o MediaRecorder
             const canvasStream = canvasFinal.captureStream(30);
             if (stream && stream.getAudioTracks().length > 0) { 
                 canvasStream.addTrack(stream.getAudioTracks()[0]); 
@@ -415,7 +414,7 @@
         }
 
         /**
-         * Desenha o vídeo da câmera no Canvas com correção de espelhamento e rotação (removida).
+         * Desenha o vídeo da câmera no Canvas com correção de espelhamento.
          */
         function drawVideoToCanvas(ctx, w, h, applyMirroredScale) {
             const vw = video.videoWidth; 
@@ -427,7 +426,7 @@
             
             ctx.translate(w / 2, h / 2); 
             
-            // CORREÇÃO: Mantemos apenas o espelhamento para a câmera frontal
+            // Espelhamento para a câmera frontal no salvamento
             if (usingFrontCamera && applyMirroredScale) { 
                  ctx.scale(-1, 1);
             } 
@@ -454,50 +453,53 @@
          */
         function drawImageLayer(ctx, sourceElement, w, h, mode) {
             
-            return new Promise(r => {
-                
-                function drawInternal(ctx, element, w, h) {
-                    let originalW, originalH;
-                    if (element.tagName === 'VIDEO') {
-                        originalW = element.videoWidth;
-                        originalH = element.videoHeight;
-                    } else { 
-                        originalW = element.naturalWidth || element.width;
-                        originalH = element.naturalHeight || element.height;
-                    }
-                    
-                    if (!originalW || !originalH) { r(); return; } 
+            // Retorna Promise para o modo de gravação (video)
+            if (mode === 'video' || sourceElement.tagName === 'IMG') {
+                return new Promise(r => {
+                    function drawInternal(ctx, element, w, h) {
+                        let originalW, originalH;
+                        if (element.tagName === 'VIDEO') {
+                            originalW = element.videoWidth;
+                            originalH = element.videoHeight;
+                        } else { 
+                            originalW = element.naturalWidth || element.width;
+                            originalH = element.naturalHeight || element.height;
+                        }
+                        
+                        if (!originalW || !originalH) { r(); return; } 
 
-                    const targetW = w;
-                    const imgRatio = originalW / originalH;
-                    const targetH = targetW / imgRatio;
-                    
-                    const targetX = 0;
-                    const targetY = h - targetH; 
-                    
-                    ctx.drawImage(element, targetX, targetY, targetW, targetH);
-                }
-                
-                if (mode === 'photo') {
-                    if (sourceElement.tagName === 'VIDEO' && sourceElement.readyState < 2) {
-                        // Se for uma moldura de vídeo, espera carregar
-                        sourceElement.onloadeddata = () => {
-                            drawInternal(ctx, sourceElement, w, h);
-                            r();
-                            sourceElement.onloadeddata = null; 
-                        };
-                    } else {
-                        drawInternal(ctx, sourceElement, w, h); r();
+                        const targetW = w;
+                        const imgRatio = originalW / originalH;
+                        const targetH = targetW / imgRatio;
+                        
+                        const targetX = 0;
+                        const targetY = h - targetH; 
+                        
+                        ctx.drawImage(element, targetX, targetY, targetW, targetH);
+                        r();
                     }
-                } else if (mode === 'video') {
-                    drawInternal(ctx, sourceElement, w, h);
-                    r();
-                }
-            });
+                    // Para o modo 'video', desenha imediatamente. Para IMG, desenha.
+                    drawInternal(ctx, sourceElement, w, h); 
+                });
+            } else {
+                // Modo 'photo' com moldura WEBM (tratamento síncrono simplificado)
+                 let originalW = sourceElement.videoWidth;
+                 let originalH = sourceElement.videoHeight;
+
+                 if (!originalW || !originalH) return;
+                 
+                 const targetW = w;
+                 const imgRatio = originalW / originalH;
+                 const targetH = targetW / imgRatio;
+                 
+                 const targetX = 0;
+                 const targetY = h - targetH; 
+                 
+                 ctx.drawImage(sourceElement, targetX, targetY, targetW, targetH);
+            }
         }
         
         // --- FUNÇÕES DE UTILIDADE ---
-        // Funções showResult, resetCamera, initCamera, handleStreamSuccess, switchCamera, updateTimer, triggerDownload (mantidas)
 
         function flashEffect() {
             const f = document.getElementById('flash');
