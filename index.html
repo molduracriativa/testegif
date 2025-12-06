@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Câmera Customizada - GIF Animado</title>
+    <title>Câmera Customizada - Moldura em Vídeo WEBM</title>
     <style>
         :root {
             --accent: #25D366;
@@ -31,7 +31,7 @@
             transition: transform 0.3s; 
         }
         #camera.mirrored { 
-            transform: scaleX(-1); /* Espelhamento para a frontal */
+            transform: scaleX(-1); 
         }
 
         /* Canvas de Preview e Vídeo de Preview (Resultado) */
@@ -42,7 +42,7 @@
             background: black;
         }
         
-        /* MOLDURA IMAGEM (Usada para PNG estático e GIF) */
+        /* MOLDURA IMAGEM (Usada para PNG estático) */
         #molduraImagePreview {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; 
@@ -53,7 +53,7 @@
             display: none;
         }
         
-        /* MOLDURA VÍDEO (Não usado) */
+        /* MOLDURA VÍDEO (USADO PARA A ANIMAÇÃO WEBM) */
         #molduraVideoPreview {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             object-fit: cover; 
@@ -162,8 +162,8 @@
             <canvas id="canvasFinal"></canvas>
             <video id="videoPreview" playsinline controls></video>
             
-            <img id="molduraImagePreview" alt="Moldura Estática/GIF" src="" /> 
-            <video id="molduraVideoPreview" autoplay loop muted playsinline preload="auto" alt="Moldura Animada" src=""></video> 
+            <img id="molduraImagePreview" alt="Moldura Estática" src="" /> 
+            <video id="molduraVideoPreview" autoplay loop muted playsinline preload="auto" alt="Moldura Animada" src="molduravideo.webm"></video> 
 
             <div class="flash" id="flash"></div>
 
@@ -175,7 +175,7 @@
 
                 <div class="controls-bottom">
                     <div class="frame-selector">
-                        <button class="btn btn-frame" id="m1Btn">ANIMAÇÃO (GIF)</button> 
+                        <button class="btn btn-frame" id="m1Btn">ANIMAÇÃO</button> 
                         <button class="btn" id="m2Btn">PNG 2</button>
                     </div>
 
@@ -208,12 +208,12 @@
     </div>
 
     <script>
-        // --- CONFIGURAÇÃO E ESTADOS: VOLTANDO PARA GIF ---
+        // --- CONFIGURAÇÃO E ESTADOS ---
         const MOLDURAS = { 
-            // CONFIGURAÇÃO PARA USAR O ARQUIVO GIF
+            // AGORA USAMOS O TIPO 'video' E O ARQUIVO molduravideo.webm
             'm1': { 
-                type: 'image', // Tipo 'image' aceita GIF animado
-                src: 'molduragif.gif' // Nome do seu arquivo GIF
+                type: 'video', 
+                src: 'molduravideo.webm' 
             }, 
             'm2': { type: 'image', src: 'moldura2.png' } 
         };
@@ -228,8 +228,6 @@
         let animationFrameId = null;
         let finalFileExtension = 'webm';
         let currentDownloadData = { blob: null, filename: null, url: null };
-
-        // --- VARIÁVEIS DE SEQUÊNCIA REMOVIDAS, POIS NÃO SÃO MAIS NECESSÁRIAS ---
 
         // --- ELEMENTOS DOM ---
         const video = document.getElementById('camera');
@@ -268,8 +266,6 @@
         
         downloadBtn.addEventListener('click', triggerDownload);
 
-        // --- FUNÇÕES DE ANIMAÇÃO REMOVIDAS (o navegador cuida do loop do GIF) ---
-
 
         // --- FUNÇÕES PRINCIPAIS ---
 
@@ -279,34 +275,40 @@
             currentMolduraKey = key;
             const moldura = MOLDURAS[key];
 
-            // Limpa e esconde o elemento de vídeo, já que o GIF usa o elemento de imagem
+            // Limpa e esconde as molduras
             molduraImagePreview.style.display = 'none';
             molduraVideoPreview.style.display = 'none';
 
-            // LÓGICA DE MOLDURA DE IMAGEM (Inclui GIF)
             if (moldura.type === 'image') {
+                // PNG ESTÁTICO
                 molduraImagePreview.src = moldura.src;
                 molduraImagePreview.style.display = 'block';
+            } else if (moldura.type === 'video') {
+                // MOLDURA EM VÍDEO (.webm)
+                molduraVideoPreview.src = moldura.src;
+                molduraVideoPreview.style.display = 'block';
+                if (autoPlay) molduraVideoPreview.play();
             }
         }
 
 
         function getActiveMolduraElement() {
-            // O GIF animado usa o elemento <img>
-            return molduraImagePreview;
+            const moldura = MOLDURAS[currentMolduraKey];
+            return moldura.type === 'image' ? molduraImagePreview : molduraVideoPreview;
         }
 
 
         async function takePhoto() {
             flashEffect();
             
+            // Define o tamanho final do arquivo (Retrato)
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
-            // Desenha a câmera (CORREÇÃO DE ROTAÇÃO INCLUÍDA)
-            drawVideoToCanvas(ctxFinal, 1080, 1920, true);
+            // 1. Desenha a câmera (Com correção de rotação de 180° e espelhamento)
+            drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, false); 
             
-            // Desenha a moldura (pegará o frame ATUAL do GIF)
-            await drawImageLayer(ctxFinal, getActiveMolduraElement(), 1080, 1920, 'photo'); 
+            // 2. Desenha a moldura (pega o frame atual do vídeo ou a imagem do PNG)
+            await drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'photo'); 
 
             // Preview na tela
             canvasPreview.width = stage.clientWidth; canvasPreview.height = stage.clientHeight;
@@ -326,17 +328,24 @@
             recordingStartTime = Date.now();
             recordedChunks = [];
             
+            // Define o tamanho final do arquivo de vídeo (Retrato)
             canvasFinal.width = 720; 
             canvasFinal.height = 1280;
+            
+            // Se for moldura de vídeo, inicia o loop do vídeo
+            const moldura = MOLDURAS[currentMolduraKey];
+            if (moldura.type === 'video') {
+                molduraVideoPreview.play();
+            }
 
-            // O loop agora só desenha o GIF e a câmera, sem a complexidade da Sequência PNG
+            // Loop principal de gravação (desenha vídeo + moldura a cada frame)
             const loop = () => {
                 if (!isRecording) return;
                 
-                // 1. Desenha o Vídeo da Câmera (COM ROTAÇÃO DE 180 CORRIGIDA)
-                drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true);
+                // 1. Desenha o Vídeo da Câmera (Com correção de rotação de 180° e espelhamento)
+                drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, false); 
                 
-                // 2. Desenha a Moldura (GIF)
+                // 2. Desenha a Moldura (que será o vídeo WEBM animado)
                 drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'video');
                 
                 updateTimer();
@@ -344,7 +353,9 @@
             };
             loop();
 
+            // Configura o MediaRecorder
             const canvasStream = canvasFinal.captureStream(30);
+            // Adiciona áudio da câmera
             if (stream && stream.getAudioTracks().length > 0) { 
                 canvasStream.addTrack(stream.getAudioTracks()[0]); 
             }
@@ -370,6 +381,9 @@
             if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
             recordingTimer.style.display = 'none';
             recordingTimer.innerText = "00:00";
+            
+            // Pausa a moldura de vídeo
+            molduraVideoPreview.pause();
         }
 
         function finishVideo() {
@@ -379,7 +393,13 @@
             showResult('video', blob);
         }
 
-        // FUNÇÃO DE DESENHO DE VÍDEO NO CANVAS (COM ROTAÇÃO DE 180deg PARA CORRIGIR INVERSÃO)
+        /**
+         * Desenha o vídeo da câmera no Canvas com correção de rotação e espelhamento.
+         * @param {CanvasRenderingContext2D} ctx - Contexto do Canvas.
+         * @param {number} w - Largura do Canvas.
+         * @param {number} h - Altura do Canvas.
+         * @param {boolean} mirrored - Indica se deve aplicar espelhamento (usado apenas no preview, mas não no Canvas final para download).
+         */
         function drawVideoToCanvas(ctx, w, h, mirrored) {
             const vw = video.videoWidth; 
             const vh = video.videoHeight;
@@ -388,16 +408,22 @@
             ctx.clearRect(0, 0, w, h);
             ctx.save();
             
-            // --- TRANSFORMAÇÃO PARA CORRIGIR O VÍDEO NO ARQUIVO SALVO ---
-            ctx.translate(w / 2, h / 2); // Move para o centro
-            ctx.rotate(Math.PI); // Rotação de 180 graus
-            // -----------------------------------------------------------
-
-            if (usingFrontCamera && mirrored) {
-                // Espelhamento para câmera frontal
+            // --- CORREÇÃO DE ROTAÇÃO E ESPELHAMENTO ---
+            ctx.translate(w / 2, h / 2); 
+            
+            // 1. CORREÇÃO DE ROTAÇÃO 180° (Resolve o problema do vídeo/foto salvo sair de ponta-cabeça)
+            ctx.rotate(Math.PI); 
+            
+            // 2. CORREÇÃO DE ESPELHAMENTO (Apenas para Câmera Frontal, se necessário no Canvas de saída)
+            if (usingFrontCamera && !mirrored) { 
+                // Quando o vídeo da câmera frontal é salvo, ele já vem "espelhado" (normal).
+                // Se a câmera frontal estiver ativa e *não* estivermos no modo "preview com espelhamento", 
+                // aplicamos o espelhamento para que o vídeo salvo fique como a pessoa viu no preview.
                 ctx.scale(-1, 1);
             }
             
+            // ------------------------------------------
+
             const vidRatio = vw / vh;
             let dw, dh;
 
@@ -408,7 +434,6 @@
                 dw = w; dh = w / vidRatio; 
             }
             
-            // Desenha a imagem (agora de volta ao centro rotacionado)
             const dx = -dw / 2;
             const dy = -dh / 2;
             
@@ -416,49 +441,55 @@
             ctx.restore();
         }
         
+        /**
+         * Desenha a moldura (imagem ou vídeo) no Canvas final.
+         */
         function drawImageLayer(ctx, sourceElement, w, h, mode) {
             
-            const isVideoElement = sourceElement.tagName === 'VIDEO';
-            
-            if (mode === 'photo') {
-                return new Promise(r => {
-                    if (isVideoElement) {
-                        r();
-                    } else {
-                        // Modo foto: desenha o elemento Image ou o frame atual do GIF
-                        drawInternal(ctx, sourceElement, w, h); r();
-                    }
-                });
-            } else if (mode === 'video') {
-                // MODO VÍDEO: Chamamos drawInternal diretamente com o elemento
-                drawInternal(ctx, sourceElement, w, h);
-                return;
-            }
-
-            function drawInternal(ctx, element, w, h) {
+            return new Promise(r => {
                 
-                let originalW, originalH;
-                if (element.tagName === 'VIDEO') {
-                    originalW = element.videoWidth;
-                    originalH = element.videoHeight;
-                } else { 
-                    // Usa naturalWidth/naturalHeight para PNG/GIF
-                    originalW = element.naturalWidth || element.width;
-                    originalH = element.naturalHeight || element.height;
+                // Função auxiliar para desenhar a moldura
+                function drawInternal(ctx, element, w, h) {
+                    let originalW, originalH;
+                    if (element.tagName === 'VIDEO') {
+                        originalW = element.videoWidth;
+                        originalH = element.videoHeight;
+                    } else { 
+                        originalW = element.naturalWidth || element.width;
+                        originalH = element.naturalHeight || element.height;
+                    }
+                    
+                    if (!originalW || !originalH) return; 
+
+                    const targetW = w;
+                    const imgRatio = originalW / originalH;
+                    const targetH = targetW / imgRatio;
+                    
+                    // Desenha no fundo (object-position: bottom)
+                    const targetX = 0;
+                    const targetY = h - targetH; 
+                    
+                    ctx.drawImage(element, targetX, targetY, targetW, targetH);
                 }
                 
-                if (!originalW || !originalH) return; 
-
-                const targetW = w;
-                const imgRatio = originalW / originalH;
-                const targetH = targetW / imgRatio;
-                
-                // Lógica para desenhar a moldura no fundo (bottom) e cobrir a largura (cover)
-                const targetX = 0;
-                const targetY = h - targetH; 
-                
-                ctx.drawImage(element, targetX, targetY, targetW, targetH);
-            }
+                // Para fotos, é preciso esperar que o frame seja carregado, se for o caso.
+                if (mode === 'photo') {
+                    // Se for um elemento de vídeo, espera ele estar pronto para desenhar o frame atual
+                    if (sourceElement.tagName === 'VIDEO' && sourceElement.readyState < 2) {
+                        sourceElement.onloadeddata = () => {
+                            drawInternal(ctx, sourceElement, w, h);
+                            r();
+                            sourceElement.onloadeddata = null; // Limpa o handler
+                        };
+                    } else {
+                        drawInternal(ctx, sourceElement, w, h); r();
+                    }
+                } else if (mode === 'video') {
+                    // No modo vídeo (gravação), desenhamos o frame atual imediatamente
+                    drawInternal(ctx, sourceElement, w, h);
+                    r();
+                }
+            });
         }
         
         // --- FUNÇÕES DE UTILIDADE ---
@@ -469,7 +500,8 @@
         }
 
         function showResult(type, blob = null) {
-            // Se o GIF estava animando, o navegador já cuida da pausa
+            // Pausa a moldura de vídeo para não continuar rodando
+            molduraVideoPreview.pause();
             
             video.style.display = 'none'; 
             molduraImagePreview.style.display = 'none'; 
@@ -507,21 +539,28 @@
 
             video.style.display = 'block'; 
             
-            // Retorna a moldura ativa (o GIF continuará animando automaticamente)
-            const activeElement = getActiveMolduraElement();
-            activeElement.style.display = 'block';
+            // Retorna a moldura ativa e a reprodução
+            setMoldura(document.getElementById('m1Btn'), currentMolduraKey, true);
             
             resultUI.style.display = 'none'; cameraUI.style.display = 'flex';
             errorMsg.innerText = "";
         }
         
+        // CORRIGIDO: Constraints de Câmera para melhorar o Enquadramento/Zoom (usando o campo de visão vertical máximo)
         async function initCamera(tryAudio = true) {
             if (stream) { stream.getTracks().forEach(track => track.stop()); stream = null; }
             errorMsg.innerText = "Solicitando permissões...";
 
             const currentFacingMode = usingFrontCamera ? 'user' : 'environment';
             const constraints = {
-                video: { facingMode: currentFacingMode, width: { ideal: 720 }, height: { ideal: 1280 } },
+                video: { 
+                    facingMode: currentFacingMode, 
+                    // Tenta forçar uma alta resolução vertical para usar o campo de visão completo
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 },
+                    // Força a proporção de celular (vertical)
+                    aspectRatio: { ideal: 9/16 } 
+                },
                 audio: tryAudio
             };
 
@@ -529,7 +568,8 @@
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 handleStreamSuccess(stream);
             } catch (err) {
-                if (tryAudio) { initCamera(false); } else { errorMsg.innerText = "FALHA CRÍTICA! Câmera não pôde ser iniciada."; }
+                console.error("Erro ao acessar câmera:", err);
+                if (tryAudio) { initCamera(false); } else { errorMsg.innerText = "FALHA CRÍTICA: Acesso à câmera negado ou indisponível."; }
             }
         }
 
@@ -545,7 +585,7 @@
                 startScreen.style.display = 'none';
                 cameraUI.style.display = 'flex';
                 
-                // Inicia a moldura ativa (GIF)
+                // Inicia a moldura ativa (e o loop de reprodução)
                 setMoldura(document.getElementById('m1Btn'), currentMolduraKey, true);
 
                 errorMsg.innerText = "";
