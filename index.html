@@ -61,7 +61,7 @@
             pointer-events: none;
             z-index: 5;
             transform: none; 
-            display: none; /* Inicia escondido */
+            display: none; 
         }
 
         #videoPreview, #canvasPreview { display: none; z-index: 6; background: #000; }
@@ -80,7 +80,9 @@
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
 
         .controls-bottom {
-            display: flex; flex-direction: column; align-items: center; gap: 15px; pointer-events: auto; padding-bottom: 20px;
+            display: flex; flex-direction: column; align-items: center; 
+            gap: 30px; /* CORREÇÃO: Aumentado para 30px para evitar sobreposição dos botões */
+            pointer-events: auto; padding-bottom: 20px;
         }
         .btn {
             padding: 10px 16px; font-size: 14px; font-weight: 600;
@@ -88,6 +90,12 @@
             background: rgba(0, 0, 0, 0.65); color: #fff; cursor: pointer; backdrop-filter: blur(4px);
         }
         .btn-frame { border-color: var(--accent); } 
+        
+        /* Ajuste do Frame Selector */
+        .frame-selector {
+            display: flex;
+            gap: 10px; /* Adicionado um pequeno gap */
+        }
 
         /* Controles de Foto/Vídeo Separados */
         .capture-controls {
@@ -176,8 +184,7 @@
                 <div class="controls-bottom">
                     <div class="frame-selector">
                         <button class="btn btn-frame" id="m1Btn">ANIMAÇÃO</button> 
-                        <button class="btn" id="m2Btn">PNG 2</button>
-                    </div>
+                        <button class="btn" id="m2Btn">Foto</button> </div>
 
                     <div class="capture-controls">
                         <button id="capturePhotoBtn" class="action-btn-mini">
@@ -291,7 +298,6 @@
                 molduraImagePreview.style.display = 'block';
             } else if (moldura.type === 'video') {
                 // MOLDURA EM VÍDEO (.webm)
-                // O SRC já está definido no HTML, só precisamos exibir e dar play
                 molduraVideoPreview.style.display = 'block';
                 if (autoPlay) {
                      molduraVideoPreview.currentTime = 0; // Garante que o vídeo comece do início
@@ -314,7 +320,7 @@
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
             // 1. Desenha a câmera (Com correção de rotação e espelhamento)
-            drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true); // Use TRUE para garantir o espelhamento no salvamento se for frontal
+            drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true); 
             
             // 2. Desenha a moldura (pega o frame atual do vídeo ou a imagem do PNG)
             await drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'photo'); 
@@ -352,7 +358,7 @@
                 if (!isRecording) return;
                 
                 // 1. Desenha o Vídeo da Câmera (Com correção de rotação e espelhamento)
-                drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true); // Use TRUE para garantir o espelhamento no salvamento se for frontal
+                drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true); 
                 
                 // 2. Desenha a Moldura (que será o vídeo WEBM animado)
                 drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'video');
@@ -420,22 +426,15 @@
             // --- CORREÇÃO DE ROTAÇÃO E ESPELHAMENTO ---
             ctx.translate(w / 2, h / 2); 
             
-            // 1. CORREÇÃO DE ROTAÇÃO 180° (Resolve o problema do vídeo/foto salvo sair de ponta-cabeça)
-            ctx.rotate(Math.PI); 
+            // CORREÇÃO DE ROTAÇÃO 180°: REMOVIDA
+            // Se a imagem/vídeo continua saindo de cabeça para baixo, a rotação de 180 graus estava sendo aplicada
+            // desnecessariamente ou em duplicidade, vamos removê-la para tentar estabilizar a orientação.
             
             // 2. CORREÇÃO DE ESPELHAMENTO
-            // A câmera frontal (user) tem um comportamento que inverte o eixo X ao ser lida no canvas.
-            // Se estamos usando a câmera frontal E o salvamento ainda sai invertido (de ponta-cabeça), 
-            // a rotação de 180 já foi aplicada. Agora, se mesmo assim a imagem ainda estiver invertida, 
-            // tentamos aplicar a escala X no salvamento final.
+            // Aplicamos o espelhamento para que o vídeo salvo (se for frontal) fique como a pessoa viu no preview.
             if (usingFrontCamera && applyMirroredScale) { 
                  ctx.scale(-1, 1);
-            } else if (!usingFrontCamera && applyMirroredScale) {
-                 // Para a câmera traseira, a correção de 180 graus geralmente é suficiente.
-                 // Mas se o resultado final ainda estiver invertido em X, aplicamos a escala (isso é muito dependente do dispositivo).
-                 // Teste: Se a inversão persistir, tente descomentar a linha abaixo. Por enquanto, mantemos a rotação de 180 como primária.
-                 // ctx.scale(-1, 1); 
-            }
+            } 
             
             // ------------------------------------------
 
@@ -560,7 +559,6 @@
             errorMsg.innerText = "";
         }
         
-        // As constraints de Câmera permanecem as mesmas para manter o enquadramento corrigido.
         async function initCamera(tryAudio = true) {
             if (stream) { stream.getTracks().forEach(track => track.stop()); stream = null; }
             errorMsg.innerText = "Solicitando permissões...";
