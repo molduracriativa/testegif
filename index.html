@@ -81,7 +81,7 @@
 
         .controls-bottom {
             display: flex; flex-direction: column; align-items: center; 
-            gap: 30px; /* CORREÇÃO: Aumentado para 30px para evitar sobreposição dos botões */
+            gap: 30px; /* Espaçamento corrigido para não sobrepor botões */
             pointer-events: auto; padding-bottom: 20px;
         }
         .btn {
@@ -94,7 +94,7 @@
         /* Ajuste do Frame Selector */
         .frame-selector {
             display: flex;
-            gap: 10px; /* Adicionado um pequeno gap */
+            gap: 10px; 
         }
 
         /* Controles de Foto/Vídeo Separados */
@@ -184,7 +184,8 @@
                 <div class="controls-bottom">
                     <div class="frame-selector">
                         <button class="btn btn-frame" id="m1Btn">ANIMAÇÃO</button> 
-                        <button class="btn" id="m2Btn">Foto</button> </div>
+                        <button class="btn" id="m2Btn">Foto</button> 
+                    </div>
 
                     <div class="capture-controls">
                         <button id="capturePhotoBtn" class="action-btn-mini">
@@ -259,7 +260,6 @@
         const captureVideoBtn = document.getElementById('captureVideoBtn');
 
         // --- LISTENERS ---
-        // Garante que a moldura inicial seja carregada e o botão 'ANIMAÇÃO' esteja ativo visualmente
         document.addEventListener('DOMContentLoaded', () => {
              setMoldura(document.getElementById('m1Btn'), 'm1', false); 
         });
@@ -270,7 +270,12 @@
         document.getElementById('m1Btn').addEventListener('click', (e) => setMoldura(e.target, 'm1'));
         document.getElementById('m2Btn').addEventListener('click', (e) => setMoldura(e.target, 'm2'));
         
-        capturePhotoBtn.addEventListener('click', takePhoto);
+        // CORREÇÃO: Listener de foto simplificado para garantir que a função takePhoto() seja chamada
+        capturePhotoBtn.addEventListener('click', () => {
+            // Garante que o evento de clique não seja bloqueado
+             takePhoto(); 
+        });
+        
         captureVideoBtn.addEventListener('click', () => {
             if (!isRecording) startRecording();
             else stopRecording();
@@ -290,18 +295,20 @@
             // Limpa e esconde as molduras
             molduraImagePreview.style.display = 'none';
             molduraVideoPreview.style.display = 'none';
-            molduraVideoPreview.pause(); // Pausa sempre que troca a moldura
+            molduraVideoPreview.pause(); 
 
             if (moldura.type === 'image') {
-                // PNG ESTÁTICO
                 molduraImagePreview.src = moldura.src;
                 molduraImagePreview.style.display = 'block';
             } else if (moldura.type === 'video') {
-                // MOLDURA EM VÍDEO (.webm)
+                // CORREÇÃO: Força o display: block e tenta iniciar o play
                 molduraVideoPreview.style.display = 'block';
                 if (autoPlay) {
-                     molduraVideoPreview.currentTime = 0; // Garante que o vídeo comece do início
-                     molduraVideoPreview.play();
+                     molduraVideoPreview.currentTime = 0; 
+                     // Promise para tentar iniciar a reprodução. Autoplay pode ser bloqueado pelo browser.
+                     molduraVideoPreview.play().catch(e => {
+                         console.warn("Autoplay da moldura de vídeo bloqueado. O usuário deve interagir com a tela.", e);
+                     });
                 }
             }
         }
@@ -312,17 +319,18 @@
             return moldura.type === 'image' ? molduraImagePreview : molduraVideoPreview;
         }
 
-
+        // Função de foto agora é síncrona, esperando a Promise dentro dela
         async function takePhoto() {
             flashEffect();
             
             // Define o tamanho final do arquivo (Retrato)
             canvasFinal.width = 1080; canvasFinal.height = 1920;
             
-            // 1. Desenha a câmera (Com correção de rotação e espelhamento)
+            // 1. Desenha a câmera (Com correção de espelhamento)
             drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true); 
             
-            // 2. Desenha a moldura (pega o frame atual do vídeo ou a imagem do PNG)
+            // 2. Desenha a moldura 
+            // O "await" garante que o frame da moldura de vídeo seja capturado antes de finalizar o canvas
             await drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'photo'); 
 
             // Preview na tela
@@ -347,20 +355,20 @@
             canvasFinal.width = 720; 
             canvasFinal.height = 1280;
             
-            // Se for moldura de vídeo, inicia o loop do vídeo
+            // Inicia a moldura de vídeo (tentativa)
             const moldura = MOLDURAS[currentMolduraKey];
             if (moldura.type === 'video') {
-                molduraVideoPreview.play();
+                molduraVideoPreview.play().catch(e => { /* ignore */ });
             }
 
             // Loop principal de gravação (desenha vídeo + moldura a cada frame)
             const loop = () => {
                 if (!isRecording) return;
                 
-                // 1. Desenha o Vídeo da Câmera (Com correção de rotação e espelhamento)
+                // 1. Desenha o Vídeo da Câmera (Com correção de espelhamento)
                 drawVideoToCanvas(ctxFinal, canvasFinal.width, canvasFinal.height, true); 
                 
-                // 2. Desenha a Moldura (que será o vídeo WEBM animado)
+                // 2. Desenha a Moldura 
                 drawImageLayer(ctxFinal, getActiveMolduraElement(), canvasFinal.width, canvasFinal.height, 'video');
                 
                 updateTimer();
@@ -370,7 +378,6 @@
 
             // Configura o MediaRecorder
             const canvasStream = canvasFinal.captureStream(30);
-            // Adiciona áudio da câmera
             if (stream && stream.getAudioTracks().length > 0) { 
                 canvasStream.addTrack(stream.getAudioTracks()[0]); 
             }
@@ -397,7 +404,6 @@
             recordingTimer.style.display = 'none';
             recordingTimer.innerText = "00:00";
             
-            // Pausa a moldura de vídeo
             molduraVideoPreview.pause();
         }
 
@@ -409,11 +415,7 @@
         }
 
         /**
-         * Desenha o vídeo da câmera no Canvas com correção de rotação e espelhamento.
-         * @param {CanvasRenderingContext2D} ctx - Contexto do Canvas.
-         * @param {number} w - Largura do Canvas.
-         * @param {number} h - Altura do Canvas.
-         * @param {boolean} applyMirroredScale - Se deve aplicar o espelhamento (scaleX(-1)) para compensar a rotação.
+         * Desenha o vídeo da câmera no Canvas com correção de espelhamento e rotação (removida).
          */
         function drawVideoToCanvas(ctx, w, h, applyMirroredScale) {
             const vw = video.videoWidth; 
@@ -423,21 +425,13 @@
             ctx.clearRect(0, 0, w, h);
             ctx.save();
             
-            // --- CORREÇÃO DE ROTAÇÃO E ESPELHAMENTO ---
             ctx.translate(w / 2, h / 2); 
             
-            // CORREÇÃO DE ROTAÇÃO 180°: REMOVIDA
-            // Se a imagem/vídeo continua saindo de cabeça para baixo, a rotação de 180 graus estava sendo aplicada
-            // desnecessariamente ou em duplicidade, vamos removê-la para tentar estabilizar a orientação.
-            
-            // 2. CORREÇÃO DE ESPELHAMENTO
-            // Aplicamos o espelhamento para que o vídeo salvo (se for frontal) fique como a pessoa viu no preview.
+            // CORREÇÃO: Mantemos apenas o espelhamento para a câmera frontal
             if (usingFrontCamera && applyMirroredScale) { 
                  ctx.scale(-1, 1);
             } 
             
-            // ------------------------------------------
-
             const vidRatio = vw / vh;
             let dw, dh;
 
@@ -465,11 +459,9 @@
                 function drawInternal(ctx, element, w, h) {
                     let originalW, originalH;
                     if (element.tagName === 'VIDEO') {
-                        // Elemento de vídeo da moldura
                         originalW = element.videoWidth;
                         originalH = element.videoHeight;
                     } else { 
-                        // Elemento de imagem (PNG)
                         originalW = element.naturalWidth || element.width;
                         originalH = element.naturalHeight || element.height;
                     }
@@ -480,16 +472,15 @@
                     const imgRatio = originalW / originalH;
                     const targetH = targetW / imgRatio;
                     
-                    // Desenha no fundo (object-position: bottom)
                     const targetX = 0;
                     const targetY = h - targetH; 
                     
                     ctx.drawImage(element, targetX, targetY, targetW, targetH);
                 }
                 
-                // Para fotos, é preciso esperar que o frame de vídeo esteja pronto
                 if (mode === 'photo') {
                     if (sourceElement.tagName === 'VIDEO' && sourceElement.readyState < 2) {
+                        // Se for uma moldura de vídeo, espera carregar
                         sourceElement.onloadeddata = () => {
                             drawInternal(ctx, sourceElement, w, h);
                             r();
@@ -499,7 +490,6 @@
                         drawInternal(ctx, sourceElement, w, h); r();
                     }
                 } else if (mode === 'video') {
-                    // No modo vídeo (gravação), desenhamos o frame atual imediatamente
                     drawInternal(ctx, sourceElement, w, h);
                     r();
                 }
@@ -507,6 +497,7 @@
         }
         
         // --- FUNÇÕES DE UTILIDADE ---
+        // Funções showResult, resetCamera, initCamera, handleStreamSuccess, switchCamera, updateTimer, triggerDownload (mantidas)
 
         function flashEffect() {
             const f = document.getElementById('flash');
@@ -552,7 +543,6 @@
 
             video.style.display = 'block'; 
             
-            // Retorna a moldura ativa e a reprodução
             setMoldura(document.getElementById('m1Btn'), currentMolduraKey, true);
             
             resultUI.style.display = 'none'; cameraUI.style.display = 'flex';
@@ -587,7 +577,6 @@
             stream = newStream;
             video.srcObject = stream;
             
-            // Aplica espelhamento visual APENAS no elemento <video> de preview (corpo do vídeo)
             if (usingFrontCamera) video.classList.add('mirrored');
             else video.classList.remove('mirrored');
 
