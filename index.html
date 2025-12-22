@@ -2,168 +2,141 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Filtro com Moldura Animada</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Camera com Moldura PNG Animada</title>
 
 <style>
-body {
-    margin: 0;
-    background: #000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
+html, body {
+  margin: 0;
+  padding: 0;
+  background: black;
+  overflow: hidden;
 }
-
-#container {
-    position: relative;
-    width: 360px;
-    height: 640px;
+#stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
 }
-
 video, canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-
 #controls {
-    position: absolute;
-    bottom: 10px;
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    z-index: 10;
+  position: absolute;
+  bottom: 20px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  z-index: 10;
 }
-
 button {
-    padding: 8px 12px;
-    font-size: 14px;
+  padding: 14px 22px;
+  border-radius: 30px;
+  border: none;
+  font-size: 16px;
 }
 </style>
 </head>
 
 <body>
 
-<div id="container">
-    <video id="camera" autoplay playsinline muted></video>
-    <canvas id="canvas"></canvas>
+<div id="stage">
+  <video id="camera" autoplay muted playsinline></video>
+  <canvas id="canvas"></canvas>
 
-    <div id="controls">
-        <button id="btnRecord">Gravar</button>
-        <button id="btnStop">Parar</button>
-    </div>
+  <div id="controls">
+    <button id="recBtn">Gravar</button>
+    <button id="stopBtn">Parar</button>
+  </div>
 </div>
 
 <script>
+/* ===== CONFIGURAÇÃO DA ANIMAÇÃO ===== */
+const TOTAL_FRAMES = 31;
+const FPS = 15;
+const FRAME_PATH = 'assets/frames/frame (';
+
+/* ===== ELEMENTOS ===== */
 const video = document.getElementById('camera');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-const FPS = 24;
-const TOTAL_FRAMES = 31;
+canvas.width = 720;
+canvas.height = 1280;
 
-let frames = [];
-let currentFrame = 0;
-let lastFrameTime = 0;
-let animationId;
-
-let mediaRecorder;
-let recordedChunks = [];
-
-/* ======================
-   CAMERA
-====================== */
-navigator.mediaDevices.getUserMedia({
-    video: { facingMode: 'user' },
-    audio: false
-}).then(stream => {
-    video.srcObject = stream;
+/* ===== CÂMERA ===== */
+let stream;
+navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+.then(s => {
+  stream = s;
+  video.srcObject = s;
 });
 
-/* ======================
-   CARREGAR PNGs
-====================== */
-function loadFrames() {
-    let loaded = 0;
-
-    for (let i = 1; i <= TOTAL_FRAMES; i++) {
-        const img = new Image();
-        img.src = `assets/frames/frame (${i}).png`;
-        img.onload = () => {
-            loaded++;
-            if (loaded === TOTAL_FRAMES) {
-                console.log('Frames carregados');
-                startRender();
-            }
-        };
-        frames.push(img);
-    }
+/* ===== PRELOAD DOS FRAMES ===== */
+const frames = [];
+for (let i = 1; i <= TOTAL_FRAMES; i++) {
+  const img = new Image();
+  img.src = encodeURI(`${FRAME_PATH}${i}).png`);
+  frames.push(img);
 }
 
-/* ======================
-   RENDER LOOP
-====================== */
-function startRender() {
-    canvas.width = video.videoWidth || 360;
-    canvas.height = video.videoHeight || 640;
+/* ===== LOOP DA ANIMAÇÃO ===== */
+let frameIndex = 0;
+let lastTime = 0;
 
-    function draw(time) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+function render(time) {
+  if (time - lastTime > 1000 / FPS) {
+    frameIndex = (frameIndex + 1) % frames.length;
+    lastTime = time;
+  }
 
-        // câmera
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // controle FPS da animação
-        if (time - lastFrameTime > 1000 / FPS) {
-            currentFrame = (currentFrame + 1) % TOTAL_FRAMES;
-            lastFrameTime = time;
-        }
+  /* câmera */
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // moldura PNG
-        ctx.drawImage(frames[currentFrame], 0, 0, canvas.width, canvas.height);
+  /* moldura animada */
+  const frame = frames[frameIndex];
+  if (frame.complete) {
+    ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+  }
 
-        animationId = requestAnimationFrame(draw);
-    }
-
-    animationId = requestAnimationFrame(draw);
+  requestAnimationFrame(render);
 }
 
-/* ======================
-   GRAVAÇÃO
-====================== */
-document.getElementById('btnRecord').onclick = () => {
-    recordedChunks = [];
+requestAnimationFrame(render);
 
-    const stream = canvas.captureStream(FPS);
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+/* ===== GRAVAÇÃO ===== */
+let recorder;
+let chunks = [];
 
-    mediaRecorder.ondataavailable = e => {
-        if (e.data.size > 0) recordedChunks.push(e.data);
-    };
+document.getElementById('recBtn').onclick = () => {
+  const canvasStream = canvas.captureStream(30);
+  stream.getAudioTracks().forEach(t => canvasStream.addTrack(t));
 
-    mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
+  recorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm' });
+  chunks = [];
 
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'video_com_moldura.webm';
-        a.click();
-    };
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'video_com_moldura.webm';
+    a.click();
+  };
 
-    mediaRecorder.start();
+  recorder.start();
 };
 
-document.getElementById('btnStop').onclick = () => {
-    mediaRecorder.stop();
+document.getElementById('stopBtn').onclick = () => {
+  recorder.stop();
 };
-
-loadFrames();
 </script>
 
 </body>
