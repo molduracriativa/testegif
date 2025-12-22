@@ -2,208 +2,168 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Câmera com Moldura GIF Animada</title>
+<title>Filtro com Moldura Animada</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
 body {
+    margin: 0;
     background: #000;
-    color: #fff;
-    font-family: Arial, sans-serif;
-    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
 }
 
-.stage {
+#container {
     position: relative;
-    width: 100vw;
-    height: 100dvh;
-    background: #000;
+    width: 360px;
+    height: 640px;
 }
 
-#camera {
+video, canvas {
     position: absolute;
-    inset: 0;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transform: scaleX(-1);
 }
 
-/* GIF carregado como VIDEO (chave da correção) */
-#molduraGifVideo {
+#controls {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    pointer-events: none;
-    z-index: 5;
-}
-
-#videoPreview {
-    display: none;
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    background: #000;
-    z-index: 10;
-}
-
-.ui {
-    position: absolute;
-    bottom: 20px;
+    bottom: 10px;
     width: 100%;
     display: flex;
     justify-content: center;
-    gap: 20px;
-    z-index: 20;
+    gap: 10px;
+    z-index: 10;
 }
 
 button {
-    padding: 14px 22px;
-    border-radius: 30px;
-    border: none;
-    font-size: 16px;
-    cursor: pointer;
+    padding: 8px 12px;
+    font-size: 14px;
 }
-
-#recordBtn { background: red; color: #fff; }
-#stopBtn { background: #555; color: #fff; display: none; }
-#downloadBtn { background: #25D366; color: #fff; display: none; }
 </style>
 </head>
 
 <body>
 
-<div class="stage">
-    <video id="camera" autoplay muted playsinline></video>
+<div id="container">
+    <video id="camera" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
 
-    <!-- GIF como VIDEO -->
-    <video id="molduraGifVideo"
-           src="molduravideo.gif"
-           autoplay
-           loop
-           muted
-           playsinline>
-    </video>
-
-    <video id="videoPreview" controls playsinline></video>
-
-    <div class="ui">
-        <button id="recordBtn">● Gravar</button>
-        <button id="stopBtn">■ Parar</button>
-        <button id="downloadBtn">⬇ Baixar</button>
+    <div id="controls">
+        <button id="btnRecord">Gravar</button>
+        <button id="btnStop">Parar</button>
     </div>
 </div>
 
-<canvas id="canvas" style="display:none;"></canvas>
-
 <script>
-let stream;
-let recorder;
-let chunks = [];
-let recording = false;
-let raf;
-
-const camera = document.getElementById('camera');
-const moldura = document.getElementById('molduraGifVideo');
+const video = document.getElementById('camera');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const preview = document.getElementById('videoPreview');
 
-const recordBtn = document.getElementById('recordBtn');
-const stopBtn = document.getElementById('stopBtn');
-const downloadBtn = document.getElementById('downloadBtn');
+const FPS = 24;
+const TOTAL_FRAMES = 31;
 
-/* iniciar câmera */
+let frames = [];
+let currentFrame = 0;
+let lastFrameTime = 0;
+let animationId;
+
+let mediaRecorder;
+let recordedChunks = [];
+
+/* ======================
+   CAMERA
+====================== */
 navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "user" },
-    audio: true
-}).then(s => {
-    stream = s;
-    camera.srcObject = s;
+    video: { facingMode: 'user' },
+    audio: false
+}).then(stream => {
+    video.srcObject = stream;
 });
 
-/* loop de render */
-function draw() {
-    if (!recording) return;
+/* ======================
+   CARREGAR PNGs
+====================== */
+function loadFrames() {
+    let loaded = 0;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    /* câmera */
-    ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.scale(-1, 1);
-    ctx.drawImage(
-        camera,
-        -canvas.width / 2,
-        -canvas.height / 2,
-        canvas.width,
-        canvas.height
-    );
-    ctx.restore();
-
-    /* GIF animado (frame a frame) */
-    if (moldura.readyState >= 2) {
-        ctx.drawImage(moldura, 0, 0, canvas.width, canvas.height);
+    for (let i = 1; i <= TOTAL_FRAMES; i++) {
+        const img = new Image();
+        img.src = `assets/frames/frame (${i}).png`;
+        img.onload = () => {
+            loaded++;
+            if (loaded === TOTAL_FRAMES) {
+                console.log('Frames carregados');
+                startRender();
+            }
+        };
+        frames.push(img);
     }
-
-    raf = requestAnimationFrame(draw);
 }
 
-/* gravar */
-recordBtn.onclick = () => {
-    canvas.width = 720;
-    canvas.height = 1280;
+/* ======================
+   RENDER LOOP
+====================== */
+function startRender() {
+    canvas.width = video.videoWidth || 360;
+    canvas.height = video.videoHeight || 640;
 
-    chunks = [];
-    recording = true;
+    function draw(time) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    moldura.currentTime = 0;
-    moldura.play();
+        // câmera
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    draw();
+        // controle FPS da animação
+        if (time - lastFrameTime > 1000 / FPS) {
+            currentFrame = (currentFrame + 1) % TOTAL_FRAMES;
+            lastFrameTime = time;
+        }
 
-    const canvasStream = canvas.captureStream(30);
-    stream.getAudioTracks().forEach(t => canvasStream.addTrack(t));
+        // moldura PNG
+        ctx.drawImage(frames[currentFrame], 0, 0, canvas.width, canvas.height);
 
-    recorder = new MediaRecorder(canvasStream, { mimeType: "video/webm" });
+        animationId = requestAnimationFrame(draw);
+    }
 
-    recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
-    recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "video/webm" });
-        const url = URL.createObjectURL(blob);
-        preview.src = url;
-        preview.style.display = "block";
+    animationId = requestAnimationFrame(draw);
+}
 
-        downloadBtn.onclick = () => {
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "video_com_moldura.webm";
-            a.click();
-        };
+/* ======================
+   GRAVAÇÃO
+====================== */
+document.getElementById('btnRecord').onclick = () => {
+    recordedChunks = [];
 
-        downloadBtn.style.display = "block";
+    const stream = canvas.captureStream(FPS);
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+
+    mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
     };
 
-    recorder.start();
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
 
-    recordBtn.style.display = "none";
-    stopBtn.style.display = "inline-block";
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'video_com_moldura.webm';
+        a.click();
+    };
+
+    mediaRecorder.start();
 };
 
-/* parar */
-stopBtn.onclick = () => {
-    recording = false;
-    cancelAnimationFrame(raf);
-    recorder.stop();
-    moldura.pause();
-    stopBtn.style.display = "none";
+document.getElementById('btnStop').onclick = () => {
+    mediaRecorder.stop();
 };
+
+loadFrames();
 </script>
 
 </body>
