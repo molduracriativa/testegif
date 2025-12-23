@@ -188,11 +188,7 @@ function startRecording(){
   recordLoop();
 
   const canvasStream = canvasFinal.captureStream(30);
-
-  // 🔴 ADICIONA ÁUDIO AO STREAM FINAL
-  stream.getAudioTracks().forEach(track=>{
-    canvasStream.addTrack(track);
-  });
+  stream.getAudioTracks().forEach(track=>canvasStream.addTrack(track));
 
   mediaRecorder = new MediaRecorder(canvasStream,{mimeType:'video/webm'});
   mediaRecorder.ondataavailable=e=>recordedChunks.push(e.data);
@@ -209,7 +205,7 @@ function stopRecording(){
   recordingTimer.style.display='none';
 }
 
-/* === RESULTADO === */
+/* === RESULTADO (CORRIGIDO FOTO PREVIEW) === */
 function showResult(type,blob){
   cancelAnimationFrame(raf);
   canvasPreview.style.display='none';
@@ -224,6 +220,16 @@ function showResult(type,blob){
     videoPreview.src=url;
     videoPreview.style.display='block';
     videoPreview.play();
+  } else {
+    const img = new Image();
+    img.onload = () => {
+      canvasPreview.width = 1080;
+      canvasPreview.height = 1920;
+      ctxPreview.clearRect(0,0,1080,1920);
+      ctxPreview.drawImage(img,0,0,1080,1920);
+      canvasPreview.style.display = 'block';
+    };
+    img.src = url;
   }
 }
 
