@@ -113,10 +113,10 @@ background:#FF5722;color:#fff;
 
 <script>
 /* === PNG SEQUENCE === */
-const TOTAL_FRAMES=30;
-const FRAME_INTERVAL=60;
-const frames=[];
-let frameIndex=0,lastFrameTime=0;
+const TOTAL_FRAMES = 30;
+const FRAME_INTERVAL = 60;
+const frames = [];
+let frameIndex = 0, lastFrameTime = 0;
 
 for(let i=1;i<=TOTAL_FRAMES;i++){
   const img=new Image();
@@ -173,6 +173,7 @@ function startRecording(){
   recordedChunks=[];
   recordingTimer.style.display='block';
   recordingStartTime=Date.now();
+
   canvasFinal.width=720;
   canvasFinal.height=1280;
 
@@ -186,8 +187,14 @@ function startRecording(){
   }
   recordLoop();
 
-  const s=canvasFinal.captureStream(30);
-  mediaRecorder=new MediaRecorder(s,{mimeType:'video/webm'});
+  const canvasStream = canvasFinal.captureStream(30);
+
+  // 🔴 ADICIONA ÁUDIO AO STREAM FINAL
+  stream.getAudioTracks().forEach(track=>{
+    canvasStream.addTrack(track);
+  });
+
+  mediaRecorder = new MediaRecorder(canvasStream,{mimeType:'video/webm'});
   mediaRecorder.ondataavailable=e=>recordedChunks.push(e.data);
   mediaRecorder.onstop=()=>{
     const blob=new Blob(recordedChunks,{type:'video/webm'});
@@ -216,6 +223,7 @@ function showResult(type,blob){
   if(type==='video'){
     videoPreview.src=url;
     videoPreview.style.display='block';
+    videoPreview.play();
   }
 }
 
@@ -227,6 +235,7 @@ function updateTimer(){
 
 function resetCamera(){
   URL.revokeObjectURL(currentDownloadData.url||'');
+  videoPreview.pause();
   videoPreview.src='';
   videoPreview.style.display='none';
   camera.style.display='block';
@@ -252,7 +261,10 @@ startBtn.onclick=()=>initCamera();
 
 async function initCamera(){
   stream&&stream.getTracks().forEach(t=>t.stop());
-  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:usingFrontCamera?'user':'environment'}});
+  stream=await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:usingFrontCamera?'user':'environment'},
+    audio:true
+  });
   camera.srcObject=stream;
   camera.onloadedmetadata=()=>{
     camera.play();
