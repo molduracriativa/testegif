@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Câmera com Moldura Animada</title>
 
 <style>
@@ -267,8 +267,14 @@ function startVideo(){
   }
   loop();
 
-  const s=canvasFinal.captureStream(30);
-  recorder=new MediaRecorder(s,{mimeType:'video/webm'});
+  const canvasStream=canvasFinal.captureStream(30);
+
+  /* 🔴 áudio devolvido (ESSENCIAL p/ mobile) */
+  stream.getAudioTracks().forEach(track=>{
+    canvasStream.addTrack(track);
+  });
+
+  recorder=new MediaRecorder(canvasStream,{mimeType:'video/webm'});
   recorder.ondataavailable=e=>chunks.push(e.data);
   recorder.onstop=()=>{
     const blob=new Blob(chunks,{type:'video/webm'});
@@ -340,7 +346,8 @@ switchBtn.onclick=()=>{
 async function initCamera(){
   stream&&stream.getTracks().forEach(t=>t.stop());
   stream=await navigator.mediaDevices.getUserMedia({
-    video:{facingMode:usingFront?'user':'environment'}
+    video:{facingMode:usingFront?'user':'environment'},
+    audio:true
   });
   camera.srcObject=stream;
   camera.onloadedmetadata=()=>{
