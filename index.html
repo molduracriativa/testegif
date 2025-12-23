@@ -3,248 +3,177 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Câmera 9:16 com Moldura Animada</title>
+<title>Câmera Profissional MP4</title>
 
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-
-body {
-    background:#000;
-    overflow:hidden;
-    font-family:Arial, sans-serif;
-}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:Arial}
 
 /* CAPA */
-#startScreen {
-    position:fixed;
-    inset:0;
-    background:url("capa.jpg") center/cover no-repeat;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    z-index:10;
-}
-
-#startBtn {
-    padding:16px 30px;
-    border-radius:40px;
-    border:none;
-    font-size:18px;
-    cursor:pointer;
-}
+#startScreen{position:fixed;inset:0;background:url("capa.jpg") center/cover no-repeat;
+display:flex;justify-content:center;align-items:center;z-index:10}
+#startBtn{padding:16px 32px;border-radius:40px;border:none;font-size:18px}
 
 /* CAMERA */
-#cameraContainer {
-    position:fixed;
-    inset:0;
-    display:none;
-    background:#000;
-}
-
-video {
-    width:100%;
-    height:100%;
-    object-fit:cover;
-}
+#cameraContainer{position:fixed;inset:0;display:none}
+video{width:100%;height:100%;object-fit:cover}
 
 /* FRAME */
-#frame {
-    position:absolute;
-    inset:0;
-    pointer-events:none;
-}
+#frame{position:absolute;inset:0;pointer-events:none}
+#frame img{width:100%;height:100%;object-fit:cover}
 
-#frame img {
-    width:100%;
-    height:100%;
-    object-fit:cover;
-}
+/* ICONES */
+.icon{position:absolute;top:20px;left:20px;font-size:26px;color:#fff;z-index:5;display:none}
 
 /* CONTROLES */
-.controls {
-    position:absolute;
-    bottom:20px;
-    width:100%;
-    display:flex;
-    justify-content:space-around;
-    z-index:5;
-}
+.controls{position:absolute;bottom:30px;width:100%;display:flex;justify-content:space-around;z-index:5}
+.controls button{width:72px;height:72px;border-radius:50%;border:none;font-size:20px}
 
-.controls button {
-    width:70px;
-    height:70px;
-    border-radius:50%;
-    border:none;
-    font-size:18px;
-    cursor:pointer;
-}
+/* RECORD */
+#recordBtn{background:red;position:relative}
+#recordBtn.recording{background:#111}
+#progress{position:absolute;inset:-6px;border-radius:50%}
 
-#photoBtn { background:#fff; }
-#switchBtn { background:#ddd; }
-
-/* BOTÃO GRAVAR */
-#recordBtn {
-    background:red;
-    position:relative;
-}
-
-#recordBtn.recording {
-    background:#111;
-}
-
-#recordRing {
-    position:absolute;
-    inset:-6px;
-    border:4px solid red;
-    border-top-color:transparent;
-    border-radius:50%;
-    display:none;
-    animation:spin 1s linear infinite;
-}
-
-#recordBtn.recording #recordRing {
-    display:block;
-}
-
-@keyframes spin {
-    to { transform:rotate(360deg); }
-}
+/* PREVIEW */
+#preview{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:20}
+#preview video,#preview img{width:100%;height:100%;object-fit:cover}
+#previewButtons{position:absolute;bottom:20px;width:100%;display:flex;justify-content:space-around}
+#previewButtons button{padding:14px 26px;border-radius:30px;border:none;font-size:16px}
+#loading{position:absolute;inset:0;display:none;justify-content:center;align-items:center;
+color:#fff;font-size:18px;background:#000c;z-index:30}
 </style>
 </head>
 
 <body>
 
-<!-- CAPA -->
-<div id="startScreen">
-    <button id="startBtn">Iniciar</button>
-</div>
+<div id="startScreen"><button id="startBtn">Iniciar</button></div>
 
-<!-- CAMERA -->
 <div id="cameraContainer">
-    <video id="video" autoplay playsinline muted></video>
+  <video id="video" autoplay playsinline muted></video>
+  <div id="frame"><img id="frameImg" src="assets/frame_1.png"></div>
+  <div id="videoIcon" class="icon">🎥</div>
+  <div id="photoIcon" class="icon">📸</div>
 
-    <div id="frame">
-        <img id="frameImg" src="assets/frame_1.png">
-    </div>
-
-    <div class="controls">
-        <button id="switchBtn">↺</button>
-        <button id="photoBtn">📸</button>
-        <button id="recordBtn">
-            <div id="recordRing"></div>
-        </button>
-    </div>
+  <div class="controls">
+    <button id="photoBtn">📸</button>
+    <button id="recordBtn">●</button>
+  </div>
 </div>
+
+<div id="preview">
+  <video id="previewVideo" controls></video>
+  <img id="previewImg">
+  <div id="previewButtons">
+    <button id="cancelBtn">Refazer</button>
+    <button id="saveBtn">Salvar</button>
+  </div>
+</div>
+
+<div id="loading">Convertendo para MP4…</div>
+
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js"></script>
 
 <script>
-const video = document.getElementById("video");
-const frameImg = document.getElementById("frameImg");
-const recordBtn = document.getElementById("recordBtn");
+const video=document.getElementById("video");
+const frameImg=document.getElementById("frameImg");
+const preview=document.getElementById("preview");
+const previewVideo=document.getElementById("previewVideo");
+const loading=document.getElementById("loading");
 
-let stream;
-let mediaRecorder;
-let chunks = [];
-let recording = false;
-let cameraMode = "environment";
+const canvas=document.createElement("canvas");
+canvas.width=1080;canvas.height=1920;
+const ctx=canvas.getContext("2d");
+
+let stream,mediaRecorder,chunks=[],recording=false;
+let rafId,startTime;
+const MAX_TIME=60000;
 
 /* FRAMES */
-let frame = 1;
-setInterval(() => {
-    frame++;
-    if (frame > 30) frame = 1;
-    frameImg.src = `assets/frame_${frame}.png`;
-}, 100);
+let f=1;
+setInterval(()=>{f=f<30?f+1:1;frameImg.src=`assets/frame_${f}.png`},100);
 
 /* CAMERA */
-async function startCamera() {
-    if (stream) stream.getTracks().forEach(t => t.stop());
-
-    stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: cameraMode },
-        audio: true
-    });
-
-    video.srcObject = stream;
+async function startCamera(){
+  stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+  video.srcObject=stream;await video.play();
+}
+startBtn.onclick=async()=>{
+  startScreen.style.display="none";
+  cameraContainer.style.display="block";
+  await startCamera();
 }
 
-document.getElementById("startBtn").onclick = async () => {
-    startScreen.style.display = "none";
-    cameraContainer.style.display = "block";
-    await startCamera();
-};
-
-switchBtn.onclick = async () => {
-    cameraMode = cameraMode === "environment" ? "user" : "environment";
-    await startCamera();
-};
-
-/* FOTO 9:16 */
-photoBtn.onclick = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1080;
-    canvas.height = 1920;
-    const ctx = canvas.getContext("2d");
-
-    drawCover(ctx);
-    ctx.drawImage(frameImg, 0, 0, 1080, 1920);
-
-    download(canvas.toDataURL("image/png"), "foto.png");
-};
-
-/* VIDEO 9:16 */
-recordBtn.onclick = () => {
-    if (!recording) {
-        recording = true;
-        recordBtn.classList.add("recording");
-        chunks = [];
-
-        const canvas = document.createElement("canvas");
-        canvas.width = 1080;
-        canvas.height = 1920;
-        const ctx = canvas.getContext("2d");
-
-        const canvasStream = canvas.captureStream(30);
-        stream.getAudioTracks().forEach(t => canvasStream.addTrack(t));
-
-        mediaRecorder = new MediaRecorder(canvasStream);
-        mediaRecorder.ondataavailable = e => chunks.push(e.data);
-        mediaRecorder.onstop = () => {
-            const blob = new Blob(chunks, { type:"video/webm" });
-            download(URL.createObjectURL(blob), "video.webm");
-        };
-
-        function render() {
-            drawCover(ctx);
-            ctx.drawImage(frameImg, 0, 0, 1080, 1920);
-            if (recording) requestAnimationFrame(render);
-        }
-
-        mediaRecorder.start();
-        render();
-    } else {
-        recording = false;
-        recordBtn.classList.remove("recording");
-        mediaRecorder.stop();
-    }
-};
-
-/* FUNÇÕES AUX */
-function drawCover(ctx) {
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    const ratio = Math.max(1080/vw, 1920/vh);
-    const nw = vw * ratio;
-    const nh = vh * ratio;
-    const x = (1080 - nw) / 2;
-    const y = (1920 - nh) / 2;
-    ctx.drawImage(video, x, y, nw, nh);
+/* DRAW */
+function draw(){
+  const vw=video.videoWidth,vh=video.videoHeight;
+  if(!vw)return;
+  const s=Math.max(1080/vw,1920/vh);
+  ctx.clearRect(0,0,1080,1920);
+  ctx.drawImage(video,(1080-vw*s)/2,(1920-vh*s)/2,vw*s,vh*s);
+  ctx.drawImage(frameImg,0,0,1080,1920);
 }
 
-function download(url, name) {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
+/* FOTO */
+photoBtn.onclick=()=>{
+  draw();
+  previewImg.src=canvas.toDataURL("image/png");
+  previewImg.style.display="block";
+  previewVideo.style.display="none";
+  preview.style.display="flex";
+}
+
+/* VIDEO */
+recordBtn.onclick=()=>{
+  if(!recording){
+    recording=true;chunks=[];startTime=Date.now();
+    const out=canvas.captureStream(30);
+    stream.getAudioTracks().forEach(t=>out.addTrack(t));
+    mediaRecorder=new MediaRecorder(out,{mimeType:"video/webm"});
+    mediaRecorder.ondataavailable=e=>chunks.push(e.data);
+    mediaRecorder.onstop=convertMP4;
+    mediaRecorder.start();
+    render();
+  }else{
+    recording=false;
+    cancelAnimationFrame(rafId);
+    mediaRecorder.stop();
+  }
+};
+
+function render(){
+  draw();
+  if(Date.now()-startTime>=MAX_TIME)mediaRecorder.stop();
+  if(recording)rafId=requestAnimationFrame(render);
+}
+
+/* CONVERSÃO MP4 */
+async function convertMP4(){
+  loading.style.display="flex";
+  const {createFFmpeg,fetchFile}=FFmpeg;
+  const ffmpeg=createFFmpeg({log:false});
+  await ffmpeg.load();
+
+  ffmpeg.FS("writeFile","input.webm",await fetchFile(new Blob(chunks)));
+  await ffmpeg.run("-i","input.webm","-movflags","faststart",
+                   "-pix_fmt","yuv420p","-vcodec","libx264","output.mp4");
+  const mp4=ffmpeg.FS("readFile","output.mp4");
+  const url=URL.createObjectURL(new Blob([mp4.buffer],{type:"video/mp4"}));
+
+  previewVideo.src=url;
+  previewVideo.style.display="block";
+  previewImg.style.display="none";
+  preview.style.display="flex";
+  loading.style.display="none";
+}
+
+/* PREVIEW */
+cancelBtn.onclick=()=>preview.style.display="none";
+saveBtn.onclick=()=>{
+  const a=document.createElement("a");
+  a.href=previewVideo.src||previewImg.src;
+  a.download=previewVideo.src?"video.mp4":"foto.png";
+  a.click();
+  preview.style.display="none";
 }
 </script>
 
