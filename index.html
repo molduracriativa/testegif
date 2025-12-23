@@ -8,18 +8,11 @@
 <style>
 :root { --accent:#25D366; --record:#ff0000; }
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-body {
-  margin:0; background:#000; color:#fff;
-  overflow:hidden; width:100vw; height:100dvh;
-  font-family:sans-serif;
-}
+body { margin:0; background:#000; color:#fff; overflow:hidden; width:100vw; height:100dvh; font-family:sans-serif; }
 
 .frame,.stage{position:relative;width:100%;height:100%;overflow:hidden;}
 #camera{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
-#canvasPreview,#videoPreview{
-  position:absolute;inset:0;width:100%;height:100%;
-  display:none;z-index:6;
-}
+#canvasPreview,#videoPreview{position:absolute;inset:0;width:100%;height:100%;display:none;z-index:6;}
 #canvasFinal{display:none;}
 
 .ui-layer{
@@ -30,30 +23,21 @@ body {
 }
 
 .top-bar{display:flex;justify-content:space-between;pointer-events:auto;}
-.timer-badge{
-  background:var(--record);
-  padding:6px 14px;border-radius:14px;
-  display:none;
-}
+.timer-badge{background:var(--record);padding:6px 14px;border-radius:14px;display:none;}
 
-.controls-bottom{
-  display:flex;flex-direction:column;
-  align-items:center;gap:30px;
-  pointer-events:auto;
-}
-
+.controls-bottom{display:flex;flex-direction:column;align-items:center;gap:30px;pointer-events:auto;}
 .capture-controls{display:flex;gap:20px;}
 
 .action-btn-mini,.action-btn-large{
-  border-radius:50%;border:3px solid #fff;
-  background:rgba(255,255,255,.2);
-  display:flex;align-items:center;justify-content:center;
+border-radius:50%;border:3px solid #fff;
+background:rgba(255,255,255,.2);
+display:flex;align-items:center;justify-content:center;
 }
-.action-btn-mini{width:60px;height:60px;font-size:26px;}
-.action-btn-large{width:96px;height:96px;}
+.action-btn-mini{width:54px;height:54px;font-size:24px;}
+.action-btn-large{width:86px;height:86px;}
 .action-btn-large.recording{
-  border-color:var(--record);
-  background:rgba(255,0,0,.4);
+border-color:var(--record);
+background:rgba(255,0,0,.4);
 }
 
 #resultUI{
@@ -66,7 +50,7 @@ body {
 
 #resultUI button{
   font-size:20px;
-  padding:18px 32px;
+  padding:16px 28px;
   border:none;
   border-radius:40px;
   background:#ffffff;
@@ -74,15 +58,15 @@ body {
 }
 
 #startScreen{
-  position:absolute;inset:0;
-  background:url('capajpg.jpg') center/cover;
-  display:flex;align-items:center;justify-content:center;
-  z-index:50;
+position:absolute;inset:0;
+background:url('capajpg.jpg') center/cover;
+display:flex;align-items:center;justify-content:center;
+z-index:50;
 }
 #startBtn{
-  padding:18px 32px;font-size:20px;
-  border:none;border-radius:50px;
-  background:#FF5722;color:#fff;
+padding:18px 32px;font-size:20px;
+border:none;border-radius:50px;
+background:#FF5722;color:#fff;
 }
 
 .flash{position:absolute;inset:0;background:#fff;opacity:0;transition:.1s;z-index:10;}
@@ -124,183 +108,182 @@ body {
 </div>
 
 <div id="startScreen">
-  <button id="startBtn">INICIAR</button>
+<button id="startBtn">INICIAR</button>
 </div>
 
 <script>
-/* ===== PNG SEQUENCE ===== */
+/* === PNG SEQUENCE === */
 const TOTAL_FRAMES = 30;
-const FRAME_INTERVAL = 50; // 🔧 editável (velocidade)
+const FRAME_INTERVAL = 60;
 const frames = [];
 let frameIndex = 0, lastFrameTime = 0;
 
-for (let i = 1; i <= TOTAL_FRAMES; i++) {
-  const img = new Image();
-  img.src = `assets/frame_${i}.png`;
+for(let i=1;i<=TOTAL_FRAMES;i++){
+  const img=new Image();
+  img.src=`assets/frame_${i}.png`;
   frames.push(img);
 }
 
-/* ===== VARIÁVEIS ===== */
-let stream, isRecording = false, mediaRecorder, recordedChunks = [], raf;
-let usingFrontCamera = true, recordingStartTime = 0;
-let currentDownloadData = {};
+/* === VARIÁVEIS === */
+let stream,isRecording=false,mediaRecorder,recordedChunks=[],raf;
+let usingFrontCamera=true,recordingStartTime=0;
+let currentDownloadData={};
 
-const canvasPreview = document.getElementById('canvasPreview');
-const canvasFinal = document.getElementById('canvasFinal');
-const ctxPreview = canvasPreview.getContext('2d');
-const ctxFinal = canvasFinal.getContext('2d', { alpha: false });
+const ctxPreview=canvasPreview.getContext('2d');
+const ctxFinal=canvasFinal.getContext('2d',{alpha:false});
 
-/* ===== PREVIEW LOOP ===== */
-function previewLoop(t) {
-  canvasPreview.width = 1080;
-  canvasPreview.height = 1920;
-
-  drawBackground(ctxPreview, 1080, 1920);
-  drawVideo(ctxPreview, 1080, 1920);
-  drawAnimatedFrame(ctxPreview, 1080, 1920, t);
-
-  raf = requestAnimationFrame(previewLoop);
+/* === PREVIEW LOOP === */
+function previewLoop(t){
+  canvasPreview.width=1080;
+  canvasPreview.height=1920;
+  ctxPreview.fillStyle="#000";
+  ctxPreview.fillRect(0,0,1080,1920);
+  drawVideo(ctxPreview,1080,1920);
+  drawAnimatedFrame(ctxPreview,1080,1920,t);
+  raf=requestAnimationFrame(previewLoop);
 }
 
-/* ===== DRAW ===== */
-function drawBackground(ctx, w, h) {
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, w, h);
-}
-
-function drawAnimatedFrame(ctx, w, h, t) {
-  if (t - lastFrameTime > FRAME_INTERVAL) {
-    frameIndex = (frameIndex + 1) % TOTAL_FRAMES;
-    lastFrameTime = t;
+/* === DRAW === */
+function drawAnimatedFrame(ctx,w,h,t){
+  if(t-lastFrameTime>FRAME_INTERVAL){
+    frameIndex=(frameIndex+1)%TOTAL_FRAMES;
+    lastFrameTime=t;
   }
-  const img = frames[frameIndex];
-  if (img.complete) ctx.drawImage(img, 0, 0, w, h);
+  const img=frames[frameIndex];
+  if(img.complete) ctx.drawImage(img,0,0,w,h);
 }
 
-function drawVideo(ctx, w, h) {
-  const vw = camera.videoWidth, vh = camera.videoHeight;
-  if (!vw || !vh) return;
-  const r = Math.max(w / vw, h / vh);
-  ctx.drawImage(camera, (w - vw * r) / 2, (h - vh * r) / 2, vw * r, vh * r);
+function drawVideo(ctx,w,h){
+  const vw=camera.videoWidth,vh=camera.videoHeight;
+  if(!vw||!vh)return;
+  const r=Math.max(w/vw,h/vh);
+  ctx.drawImage(camera,(w-vw*r)/2,(h-vh*r)/2,vw*r,vh*r);
 }
 
-/* ===== FOTO (JPEG COMPATÍVEL) ===== */
-function takePhoto() {
-  canvasFinal.width = 1080;
-  canvasFinal.height = 1920;
+/* === FOTO (JPEG SOCIAL SAFE) === */
+function takePhoto(){
+  cancelAnimationFrame(raf);
 
-  drawBackground(ctxFinal, 1080, 1920);
-  drawVideo(ctxFinal, 1080, 1920);
-  drawAnimatedFrame(ctxFinal, 1080, 1920, performance.now());
+  canvasFinal.width=1080;
+  canvasFinal.height=1920;
+  ctxFinal.fillStyle="#000";
+  ctxFinal.fillRect(0,0,1080,1920);
+  drawVideo(ctxFinal,1080,1920);
+  drawAnimatedFrame(ctxFinal,1080,1920,performance.now());
+
+  // 👉 MOSTRA PREVIEW DA FOTO
+  canvasPreview.width=1080;
+  canvasPreview.height=1920;
+  ctxPreview.drawImage(canvasFinal,0,0);
 
   canvasFinal.toBlob(
-    b => showResult('image', b),
+    b=>showResult('image',b),
     'image/jpeg',
     0.95
   );
 }
 
-/* ===== VÍDEO ===== */
-function startRecording() {
-  isRecording = true;
-  recordedChunks = [];
-  recordingTimer.style.display = 'block';
-  recordingStartTime = Date.now();
+/* === VÍDEO (INALTERADO) === */
+function startRecording(){
+  isRecording=true;
+  recordedChunks=[];
+  recordingTimer.style.display='block';
+  recordingStartTime=Date.now();
 
-  canvasFinal.width = 720;
-  canvasFinal.height = 1280;
+  canvasFinal.width=720;
+  canvasFinal.height=1280;
 
-  function recordLoop(t) {
-    if (!isRecording) return;
-    drawBackground(ctxFinal, 720, 1280);
-    drawVideo(ctxFinal, 720, 1280);
-    drawAnimatedFrame(ctxFinal, 720, 1280, t);
+  function recordLoop(t){
+    if(!isRecording)return;
+    ctxFinal.fillStyle="#000";
+    ctxFinal.fillRect(0,0,720,1280);
+    drawVideo(ctxFinal,720,1280);
+    drawAnimatedFrame(ctxFinal,720,1280,t);
     updateTimer();
     requestAnimationFrame(recordLoop);
   }
   recordLoop();
 
-  const s = canvasFinal.captureStream(30);
-  mediaRecorder = new MediaRecorder(s, { mimeType: 'video/webm' });
-  mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
-  mediaRecorder.onstop = () => {
-    const blob = new Blob(recordedChunks, { type: 'video/webm' });
-    showResult('video', blob);
+  const canvasStream=canvasFinal.captureStream(30);
+  stream.getAudioTracks().forEach(track=>canvasStream.addTrack(track));
+
+  mediaRecorder=new MediaRecorder(canvasStream,{mimeType:'video/webm'});
+  mediaRecorder.ondataavailable=e=>recordedChunks.push(e.data);
+  mediaRecorder.onstop=()=>{
+    const blob=new Blob(recordedChunks,{type:'video/webm'});
+    showResult('video',blob);
   };
   mediaRecorder.start();
 }
 
-function stopRecording() {
-  isRecording = false;
+function stopRecording(){
+  isRecording=false;
   mediaRecorder.stop();
-  recordingTimer.style.display = 'none';
+  recordingTimer.style.display='none';
 }
 
-/* ===== RESULTADO ===== */
-function showResult(type, blob) {
-  cancelAnimationFrame(raf);
-  canvasPreview.style.display = 'none';
-  camera.style.display = 'none';
-  cameraUI.style.display = 'none';
-  resultUI.style.display = 'flex';
+/* === RESULTADO === */
+function showResult(type,blob){
+  canvasPreview.style.display='block';
+  camera.style.display='none';
+  cameraUI.style.display='none';
+  resultUI.style.display='flex';
 
-  const ext = type === 'image' ? 'jpg' : 'webm';
-  const url = URL.createObjectURL(blob);
-  currentDownloadData = {
-    url,
-    filename: `${type}_${Date.now()}.${ext}`
-  };
+  const ext=type==='image'?'jpg':'webm';
+  const url=URL.createObjectURL(blob);
+  currentDownloadData={url,filename:`${type}_${Date.now()}.${ext}`};
 
-  if (type === 'video') {
-    videoPreview.src = url;
-    videoPreview.style.display = 'block';
+  if(type==='video'){
+    videoPreview.src=url;
+    videoPreview.style.display='block';
+    videoPreview.play();
   }
 }
 
-/* ===== AUX ===== */
-function updateTimer() {
-  const s = Math.floor((Date.now() - recordingStartTime) / 1000);
-  recordingTimer.innerText = `00:${String(s).padStart(2, '0')}`;
+/* === AUX === */
+function updateTimer(){
+  const s=Math.floor((Date.now()-recordingStartTime)/1000);
+  recordingTimer.innerText=`00:${String(s).padStart(2,'0')}`;
 }
 
-function resetCamera() {
-  URL.revokeObjectURL(currentDownloadData.url || '');
-  videoPreview.src = '';
-  videoPreview.style.display = 'none';
-  camera.style.display = 'block';
-  canvasPreview.style.display = 'block';
-  cameraUI.style.display = 'flex';
-  resultUI.style.display = 'none';
+function resetCamera(){
+  URL.revokeObjectURL(currentDownloadData.url||'');
+  videoPreview.pause();
+  videoPreview.src='';
+  videoPreview.style.display='none';
+  camera.style.display='block';
+  canvasPreview.style.display='block';
+  cameraUI.style.display='flex';
+  resultUI.style.display='none';
   previewLoop(performance.now());
 }
 
-function triggerDownload() {
-  const a = document.createElement('a');
-  a.href = currentDownloadData.url;
-  a.download = currentDownloadData.filename;
+function triggerDownload(){
+  const a=document.createElement('a');
+  a.href=currentDownloadData.url;
+  a.download=currentDownloadData.filename;
   a.click();
 }
 
-/* ===== EVENTS ===== */
-downloadBtn.onclick = triggerDownload;
-newPhotoBtn.onclick = resetCamera;
-capturePhotoBtn.onclick = takePhoto;
-captureVideoBtn.onclick = () => isRecording ? stopRecording() : startRecording();
-switchBtn.onclick = () => { usingFrontCamera = !usingFrontCamera; initCamera(); };
-startBtn.onclick = () => initCamera();
+downloadBtn.onclick=triggerDownload;
+newPhotoBtn.onclick=resetCamera;
+capturePhotoBtn.onclick=takePhoto;
+captureVideoBtn.onclick=()=>isRecording?stopRecording():startRecording();
+switchBtn.onclick=()=>{usingFrontCamera=!usingFrontCamera;initCamera();};
+startBtn.onclick=()=>initCamera();
 
-/* ===== CAMERA ===== */
-async function initCamera() {
-  stream && stream.getTracks().forEach(t => t.stop());
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: usingFrontCamera ? 'user' : 'environment' }
+async function initCamera(){
+  stream&&stream.getTracks().forEach(t=>t.stop());
+  stream=await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:usingFrontCamera?'user':'environment'},
+    audio:true
   });
-  camera.srcObject = stream;
-  camera.onloadedmetadata = () => {
+  camera.srcObject=stream;
+  camera.onloadedmetadata=()=>{
     camera.play();
-    startScreen.style.display = 'none';
-    cameraUI.style.display = 'flex';
-    canvasPreview.style.display = 'block';
+    startScreen.style.display='none';
+    cameraUI.style.display='flex';
+    canvasPreview.style.display='block';
     previewLoop(performance.now());
   };
 }
