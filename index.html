@@ -3,90 +3,112 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Câmera com Moldura Animada</title>
+<title>Câmera 9:16 com Moldura Animada</title>
 
 <style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+* { margin:0; padding:0; box-sizing:border-box; }
 
 body {
-    background: #000;
-    font-family: Arial, sans-serif;
-    overflow: hidden;
+    background:#000;
+    overflow:hidden;
+    font-family:Arial, sans-serif;
 }
 
 /* CAPA */
 #startScreen {
-    position: fixed;
-    inset: 0;
-    background: url("capa.jpg") center/cover no-repeat;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 10;
+    position:fixed;
+    inset:0;
+    background:url("capa.jpg") center/cover no-repeat;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    z-index:10;
 }
 
 #startBtn {
-    padding: 16px 28px;
-    font-size: 18px;
-    border-radius: 50px;
-    border: none;
-    background: #fff;
-    cursor: pointer;
+    padding:16px 30px;
+    border-radius:40px;
+    border:none;
+    font-size:18px;
+    cursor:pointer;
 }
 
 /* CAMERA */
 #cameraContainer {
-    position: fixed;
-    inset: 0;
-    display: none;
-    background: #000;
+    position:fixed;
+    inset:0;
+    display:none;
+    background:#000;
 }
 
 video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    width:100%;
+    height:100%;
+    object-fit:cover;
 }
 
-/* FRAME ANIMADO */
+/* FRAME */
 #frame {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
+    position:absolute;
+    inset:0;
+    pointer-events:none;
 }
 
 #frame img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    width:100%;
+    height:100%;
+    object-fit:cover;
 }
 
 /* CONTROLES */
 .controls {
-    position: absolute;
-    bottom: 20px;
-    width: 100%;
-    display: flex;
-    justify-content: space-around;
-    z-index: 5;
+    position:absolute;
+    bottom:20px;
+    width:100%;
+    display:flex;
+    justify-content:space-around;
+    z-index:5;
 }
 
 .controls button {
-    width: 70px;
-    height: 70px;
-    border-radius: 50%;
-    border: none;
-    font-size: 14px;
-    cursor: pointer;
+    width:70px;
+    height:70px;
+    border-radius:50%;
+    border:none;
+    font-size:18px;
+    cursor:pointer;
 }
 
-#photoBtn { background: #fff; }
-#videoBtn { background: red; color: #fff; }
-#switchBtn { background: #ddd; }
+#photoBtn { background:#fff; }
+#switchBtn { background:#ddd; }
+
+/* BOTÃO GRAVAR */
+#recordBtn {
+    background:red;
+    position:relative;
+}
+
+#recordBtn.recording {
+    background:#111;
+}
+
+#recordRing {
+    position:absolute;
+    inset:-6px;
+    border:4px solid red;
+    border-top-color:transparent;
+    border-radius:50%;
+    display:none;
+    animation:spin 1s linear infinite;
+}
+
+#recordBtn.recording #recordRing {
+    display:block;
+}
+
+@keyframes spin {
+    to { transform:rotate(360deg); }
+}
 </style>
 </head>
 
@@ -101,122 +123,129 @@ video {
 <div id="cameraContainer">
     <video id="video" autoplay playsinline muted></video>
 
-    <!-- FRAME -->
     <div id="frame">
         <img id="frameImg" src="assets/frame_1.png">
     </div>
 
-    <!-- CONTROLES -->
     <div class="controls">
         <button id="switchBtn">↺</button>
         <button id="photoBtn">📸</button>
-        <button id="videoBtn">●</button>
+        <button id="recordBtn">
+            <div id="recordRing"></div>
+        </button>
     </div>
 </div>
 
 <script>
 const video = document.getElementById("video");
 const frameImg = document.getElementById("frameImg");
+const recordBtn = document.getElementById("recordBtn");
 
-let currentCamera = "environment";
 let stream;
 let mediaRecorder;
-let recordedChunks = [];
+let chunks = [];
 let recording = false;
+let cameraMode = "environment";
 
 /* FRAMES */
-let frameIndex = 1;
-const totalFrames = 30;
+let frame = 1;
+setInterval(() => {
+    frame++;
+    if (frame > 30) frame = 1;
+    frameImg.src = `assets/frame_${frame}.png`;
+}, 100);
 
-function animateFrames() {
-    frameIndex++;
-    if (frameIndex > totalFrames) frameIndex = 1;
-    frameImg.src = `assets/frame_${frameIndex}.png`;
-}
-setInterval(animateFrames, 100);
-
-/* START CAMERA */
+/* CAMERA */
 async function startCamera() {
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-    }
+    if (stream) stream.getTracks().forEach(t => t.stop());
 
     stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: currentCamera },
+        video: { facingMode: cameraMode },
         audio: true
     });
 
     video.srcObject = stream;
 }
 
-/* START */
 document.getElementById("startBtn").onclick = async () => {
-    document.getElementById("startScreen").style.display = "none";
-    document.getElementById("cameraContainer").style.display = "block";
+    startScreen.style.display = "none";
+    cameraContainer.style.display = "block";
     await startCamera();
 };
 
-/* TROCAR CAMERA */
-document.getElementById("switchBtn").onclick = async () => {
-    currentCamera = currentCamera === "environment" ? "user" : "environment";
+switchBtn.onclick = async () => {
+    cameraMode = cameraMode === "environment" ? "user" : "environment";
     await startCamera();
 };
 
-/* FOTO */
-document.getElementById("photoBtn").onclick = () => {
+/* FOTO 9:16 */
+photoBtn.onclick = () => {
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = 1080;
+    canvas.height = 1920;
     const ctx = canvas.getContext("2d");
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+    drawCover(ctx);
+    ctx.drawImage(frameImg, 0, 0, 1080, 1920);
 
-    const link = document.createElement("a");
-    link.download = "foto.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+    download(canvas.toDataURL("image/png"), "foto.png");
 };
 
-/* VIDEO */
-document.getElementById("videoBtn").onclick = () => {
+/* VIDEO 9:16 */
+recordBtn.onclick = () => {
     if (!recording) {
-        recordedChunks = [];
+        recording = true;
+        recordBtn.classList.add("recording");
+        chunks = [];
+
         const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        canvas.width = 1080;
+        canvas.height = 1920;
         const ctx = canvas.getContext("2d");
 
         const canvasStream = canvas.captureStream(30);
-        stream.getAudioTracks().forEach(track => canvasStream.addTrack(track));
+        stream.getAudioTracks().forEach(t => canvasStream.addTrack(t));
 
         mediaRecorder = new MediaRecorder(canvasStream);
-        mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
+        mediaRecorder.ondataavailable = e => chunks.push(e.data);
         mediaRecorder.onstop = () => {
-            const blob = new Blob(recordedChunks, { type: "video/webm" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "video.webm";
-            a.click();
+            const blob = new Blob(chunks, { type:"video/webm" });
+            download(URL.createObjectURL(blob), "video.webm");
         };
 
-        function draw() {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
-            if (recording) requestAnimationFrame(draw);
+        function render() {
+            drawCover(ctx);
+            ctx.drawImage(frameImg, 0, 0, 1080, 1920);
+            if (recording) requestAnimationFrame(render);
         }
 
-        recording = true;
         mediaRecorder.start();
-        draw();
-        document.getElementById("videoBtn").style.background = "#555";
+        render();
     } else {
         recording = false;
+        recordBtn.classList.remove("recording");
         mediaRecorder.stop();
-        document.getElementById("videoBtn").style.background = "red";
     }
 };
+
+/* FUNÇÕES AUX */
+function drawCover(ctx) {
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const ratio = Math.max(1080/vw, 1920/vh);
+    const nw = vw * ratio;
+    const nh = vh * ratio;
+    const x = (1080 - nw) / 2;
+    const y = (1920 - nh) / 2;
+    ctx.drawImage(video, x, y, nw, nh);
+}
+
+function download(url, name) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+}
 </script>
 
 </body>
