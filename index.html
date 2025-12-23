@@ -8,7 +8,7 @@
 <style>
 :root { --record:#ff0000; }
 
-* { box-sizing:border-box; }
+*{box-sizing:border-box;}
 
 body{
   margin:0;
@@ -31,6 +31,7 @@ body{
   display:none;
 }
 
+/* ===== UI ===== */
 .ui-layer{
   position:absolute;
   inset:0;
@@ -42,7 +43,21 @@ body{
   pointer-events:none;
 }
 
-/* ===== CAMERA UI ===== */
+/* ===== TOP ===== */
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  pointer-events:auto;
+}
+
+.timer{
+  background:var(--record);
+  padding:6px 14px;
+  border-radius:14px;
+  display:none;
+}
+
+/* ===== CONTROLS ===== */
 .controls-bottom{
   display:flex;
   justify-content:center;
@@ -51,7 +66,7 @@ body{
 
 .capture-controls{
   display:flex;
-  gap:20px;
+  gap:22px;
 }
 
 .action-btn-mini,.action-btn-large{
@@ -64,13 +79,17 @@ body{
 }
 
 .action-btn-mini{width:60px;height:60px;font-size:26px;}
-.action-btn-large{width:90px;height:90px;}
+.action-btn-large{width:92px;height:92px;}
 
-/* ===== RESULT UI (RODAPÉ) ===== */
+.action-btn-large.recording{
+  background:rgba(255,0,0,.45);
+  border-color:var(--record);
+}
+
+/* ===== RESULT UI ===== */
 #resultUI{
   display:none;
   pointer-events:auto;
-  align-items:center;
 }
 
 #resultUI .buttons{
@@ -94,7 +113,6 @@ body{
   background:linear-gradient(135deg,#E1306C,#FD1D1D,#F77737);
   color:#fff;
 }
-
 #downloadBtn{background:#fff;color:#000;}
 #newPhotoBtn{background:#444;color:#fff;}
 
@@ -129,15 +147,22 @@ body{
 <canvas id="canvasFinal"></canvas>
 <video id="videoPreview" playsinline controls></video>
 
+<!-- CAMERA UI -->
 <div class="ui-layer" id="cameraUI" style="display:none;">
-  <div></div>
+  <div class="top-bar">
+    <button id="switchBtn">🔄</button>
+    <div id="timer" class="timer">00:00</div>
+  </div>
+
   <div class="controls-bottom">
     <div class="capture-controls">
-      <button id="capturePhotoBtn" class="action-btn-mini">📷</button>
+      <button id="photoBtn" class="action-btn-mini">📷</button>
+      <button id="videoBtn" class="action-btn-large"></button>
     </div>
   </div>
 </div>
 
+<!-- RESULT UI -->
 <div class="ui-layer" id="resultUI">
   <div></div>
   <div class="buttons">
@@ -156,7 +181,9 @@ body{
 <script>
 /* ===== FRAMES ===== */
 const TOTAL_FRAMES=30, FRAME_INTERVAL=60;
-const frames=[]; let frameIndex=0,lastFrameTime=0;
+const frames=[];
+let frameIndex=0,lastFrameTime=0;
+
 for(let i=1;i<=TOTAL_FRAMES;i++){
   const img=new Image();
   img.src=`assets/frame_${i}.png`;
@@ -164,7 +191,9 @@ for(let i=1;i<=TOTAL_FRAMES;i++){
 }
 
 /* ===== VAR ===== */
-let stream, raf;
+let stream, usingFront=true;
+let raf, isRecording=false, recorder, chunks=[];
+let startTime=0;
 let currentDownload=null;
 
 const ctxPreview=canvasPreview.getContext('2d');
@@ -208,7 +237,7 @@ function takePhoto(){
   canvasPreview.style.display='none';
   camera.style.display='none';
 
-  if(currentDownload?.url) URL.revokeObjectURL(currentDownload.url);
+  if(currentDownload?.url)URL.revokeObjectURL(currentDownload.url);
 
   canvasFinal.toBlob(blob=>{
     const url=URL.createObjectURL(blob);
@@ -217,12 +246,64 @@ function takePhoto(){
   },'image/png',0.95);
 }
 
+/* ===== VIDEO ===== */
+function startVideo(){
+  isRecording=true;
+  videoBtn.classList.add('recording');
+  timer.style.display='block';
+  startTime=Date.now();
+  chunks=[];
+
+  canvasFinal.width=720;
+  canvasFinal.height=1280;
+
+  function loop(t){
+    if(!isRecording)return;
+    ctxFinal.clearRect(0,0,720,1280);
+    drawVideo(ctxFinal,720,1280);
+    drawFrame(ctxFinal,720,1280,t);
+    updateTimer();
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+  const s=canvasFinal.captureStream(30);
+  recorder=new MediaRecorder(s,{mimeType:'video/webm'});
+  recorder.ondataavailable=e=>chunks.push(e.data);
+  recorder.onstop=()=>{
+    const blob=new Blob(chunks,{type:'video/webm'});
+    const url=URL.createObjectURL(blob);
+    currentDownload={blob,url,name:`video_${Date.now()}.webm`,mime:'video/webm'};
+    showResult();
+    videoPreview.src=url;
+    videoPreview.style.display='block';
+    videoPreview.play();
+  };
+  recorder.start();
+}
+
+function stopVideo(){
+  isRecording=false;
+  videoBtn.classList.remove('recording');
+  timer.style.display='none';
+  recorder.stop();
+}
+
+function updateTimer(){
+  const s=Math.floor((Date.now()-startTime)/1000);
+  timer.innerText=`00:${String(s).padStart(2,'0')}`;
+}
+
+/* ===== RESULT ===== */
 function showResult(){
   cameraUI.style.display='none';
   resultUI.style.display='flex';
 }
 
-/* ===== BOTÕES ===== */
+/* ===== BUTTONS ===== */
+photoBtn.onclick=takePhoto;
+videoBtn.onclick=()=>isRecording?stopVideo():startVideo;
+
 downloadBtn.onclick=()=>{
   if(!currentDownload)return;
   const a=document.createElement('a');
@@ -238,8 +319,10 @@ shareBtn.onclick=async()=>{
 };
 
 newPhotoBtn.onclick=()=>{
-  if(currentDownload?.url) URL.revokeObjectURL(currentDownload.url);
+  if(currentDownload?.url)URL.revokeObjectURL(currentDownload.url);
   currentDownload=null;
+  videoPreview.pause();
+  videoPreview.style.display='none';
   resultUI.style.display='none';
   cameraUI.style.display='flex';
   canvasFinal.style.display='none';
@@ -248,10 +331,17 @@ newPhotoBtn.onclick=()=>{
   previewLoop(performance.now());
 };
 
+switchBtn.onclick=()=>{
+  usingFront=!usingFront;
+  initCamera();
+};
+
 /* ===== CAMERA ===== */
 async function initCamera(){
   stream&&stream.getTracks().forEach(t=>t.stop());
-  stream=await navigator.mediaDevices.getUserMedia({video:true});
+  stream=await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:usingFront?'user':'environment'}
+  });
   camera.srcObject=stream;
   camera.onloadedmetadata=()=>{
     startScreen.style.display='none';
@@ -262,7 +352,6 @@ async function initCamera(){
   };
 }
 
-capturePhotoBtn.onclick=takePhoto;
 startBtn.onclick=initCamera;
 </script>
 
