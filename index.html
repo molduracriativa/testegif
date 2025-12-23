@@ -2,21 +2,23 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Camera com Moldura PNG Animada</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Câmera com Moldura Animada PNG</title>
 
 <style>
 html, body {
   margin: 0;
   padding: 0;
-  background: black;
+  background: #000;
   overflow: hidden;
 }
+
 #stage {
   position: relative;
   width: 100vw;
   height: 100vh;
 }
+
 video, canvas {
   position: absolute;
   inset: 0;
@@ -24,6 +26,7 @@ video, canvas {
   height: 100%;
   object-fit: cover;
 }
+
 #controls {
   position: absolute;
   bottom: 20px;
@@ -33,11 +36,14 @@ video, canvas {
   gap: 20px;
   z-index: 10;
 }
+
 button {
-  padding: 14px 22px;
+  padding: 14px 24px;
   border-radius: 30px;
   border: none;
   font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
 }
 </style>
 </head>
@@ -49,57 +55,60 @@ button {
   <canvas id="canvas"></canvas>
 
   <div id="controls">
-    <button id="recBtn">Gravar</button>
-    <button id="stopBtn">Parar</button>
+    <button id="startRec">Gravar</button>
+    <button id="stopRec">Parar</button>
   </div>
 </div>
 
 <script>
-/* ===== CONFIGURAÇÃO DA ANIMAÇÃO ===== */
-const TOTAL_FRAMES = 31;
+/* ===== CONFIGURAÇÃO ===== */
+const TOTAL_FRAMES = 30;
 const FPS = 15;
-const FRAME_PATH = 'assets/frames/frame (';
+const FRAME_FOLDER = 'assets/frames';
 
 /* ===== ELEMENTOS ===== */
 const video = document.getElementById('camera');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
+/* ===== RESOLUÇÃO FINAL DO VÍDEO ===== */
 canvas.width = 720;
 canvas.height = 1280;
 
 /* ===== CÂMERA ===== */
-let stream;
-navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-.then(s => {
-  stream = s;
-  video.srcObject = s;
+let cameraStream;
+navigator.mediaDevices.getUserMedia({
+  video: { facingMode: 'user' },
+  audio: true
+}).then(stream => {
+  cameraStream = stream;
+  video.srcObject = stream;
 });
 
 /* ===== PRELOAD DOS FRAMES ===== */
 const frames = [];
 for (let i = 1; i <= TOTAL_FRAMES; i++) {
   const img = new Image();
-  img.src = encodeURI(`${FRAME_PATH}${i}).png`);
+  img.src = `${FRAME_FOLDER}/frame_${i}.png`;
   frames.push(img);
 }
 
-/* ===== LOOP DA ANIMAÇÃO ===== */
+/* ===== LOOP DE RENDER ===== */
 let frameIndex = 0;
 let lastTime = 0;
 
-function render(time) {
-  if (time - lastTime > 1000 / FPS) {
+function render(timestamp) {
+  if (timestamp - lastTime > 1000 / FPS) {
     frameIndex = (frameIndex + 1) % frames.length;
-    lastTime = time;
+    lastTime = timestamp;
   }
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  /* câmera */
+  // câmera
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  /* moldura animada */
+  // moldura animada
   const frame = frames[frameIndex];
   if (frame.complete) {
     ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
@@ -112,19 +121,29 @@ requestAnimationFrame(render);
 
 /* ===== GRAVAÇÃO ===== */
 let recorder;
-let chunks = [];
+let recordedChunks = [];
 
-document.getElementById('recBtn').onclick = () => {
+document.getElementById('startRec').onclick = () => {
   const canvasStream = canvas.captureStream(30);
-  stream.getAudioTracks().forEach(t => canvasStream.addTrack(t));
 
-  recorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm' });
-  chunks = [];
+  cameraStream.getAudioTracks().forEach(track => {
+    canvasStream.addTrack(track);
+  });
 
-  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder = new MediaRecorder(canvasStream, {
+    mimeType: 'video/webm'
+  });
+
+  recordedChunks = [];
+
+  recorder.ondataavailable = e => {
+    if (e.data.size > 0) recordedChunks.push(e.data);
+  };
+
   recorder.onstop = () => {
-    const blob = new Blob(chunks, { type: 'video/webm' });
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
     const url = URL.createObjectURL(blob);
+
     const a = document.createElement('a');
     a.href = url;
     a.download = 'video_com_moldura.webm';
@@ -134,8 +153,10 @@ document.getElementById('recBtn').onclick = () => {
   recorder.start();
 };
 
-document.getElementById('stopBtn').onclick = () => {
-  recorder.stop();
+document.getElementById('stopRec').onclick = () => {
+  if (recorder && recorder.state !== 'inactive') {
+    recorder.stop();
+  }
 };
 </script>
 
