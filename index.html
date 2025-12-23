@@ -14,7 +14,7 @@ body{background:#000;overflow:hidden;font-family:Arial,sans-serif;width:100vw;he
     position:fixed;inset:0;
     background:url("capa.jpg") center/cover no-repeat;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    z-index:50;text-align:center
+    z-index:50
 }
 #startBtn{
     padding:18px 36px;border-radius:50px;border:none;
@@ -22,27 +22,43 @@ body{background:#000;overflow:hidden;font-family:Arial,sans-serif;width:100vw;he
 }
 
 /* STAGE */
-#stage{position:fixed;inset:0;background:#000;display:none}
+#stage{position:fixed;inset:0;display:none;background:#000}
 
 /* CAMERA */
 #camera{
-    position:absolute;inset:0;width:100%;height:100%;
-    object-fit:cover;background:#000
+    position:absolute;inset:0;
+    width:100%;height:100%;
+    object-fit:cover;background:#000;
 }
 #camera.mirror{transform:scaleX(-1)}
 
+/* GIF AO VIVO */
+#liveFrame{
+    position:absolute;inset:0;
+    width:100%;height:100%;
+    object-fit:cover;
+    pointer-events:none;
+    z-index:5;
+}
+
 /* PREVIEW */
 #canvasPreview,#videoPreview{
-    position:absolute;inset:0;width:100%;height:100%;
-    object-fit:contain;background:#000;
-    display:none;z-index:10
+    position:absolute;inset:0;
+    width:100%;height:100%;
+    object-fit:contain;
+    display:none;
+    z-index:10;
+    background:#000;
 }
 
 /* UI */
 .ui{
-    position:absolute;inset:0;z-index:20;
-    display:flex;flex-direction:column;
-    justify-content:space-between;padding:20px;
+    position:absolute;inset:0;
+    z-index:20;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    padding:20px;
     pointer-events:none
 }
 .top{display:flex;justify-content:space-between;pointer-events:auto}
@@ -64,10 +80,15 @@ body{background:#000;overflow:hidden;font-family:Arial,sans-serif;width:100vw;he
 
 /* RESULT */
 .result{
-    position:absolute;inset:0;z-index:30;
-    display:none;flex-direction:column;
-    justify-content:flex-end;align-items:center;
-    padding:30px;gap:15px;background:#000
+    position:absolute;inset:0;
+    z-index:30;
+    display:none;
+    flex-direction:column;
+    justify-content:flex-end;
+    align-items:center;
+    padding:30px;
+    gap:15px;
+    background:#000
 }
 .result button{
     width:100%;max-width:280px;padding:14px;
@@ -80,15 +101,14 @@ body{background:#000;overflow:hidden;font-family:Arial,sans-serif;width:100vw;he
 
 <body>
 
-<!-- CAPA -->
 <div id="startScreen">
-    <h2 style="color:#fff;text-shadow:0 0 6px #000">Permita a câmera</h2>
     <button id="startBtn">INICIAR</button>
 </div>
 
-<!-- STAGE -->
 <div id="stage">
     <video id="camera" autoplay playsinline muted></video>
+    <img id="liveFrame">
+
     <canvas id="canvasPreview"></canvas>
     <video id="videoPreview" controls playsinline></video>
 
@@ -110,18 +130,21 @@ body{background:#000;overflow:hidden;font-family:Arial,sans-serif;width:100vw;he
 </div>
 
 <script>
-/* ================= CONFIG ================= */
+/* CONFIG */
 const TOTAL_FRAMES = 30;
-const FRAME_FPS = 20;        // 🔥 CONTROLE DE VELOCIDADE
-const MAX_DURATION = 60;    // segundos
-/* ========================================== */
+const FRAME_FPS = 20;
+const MAX_DURATION = 60;
 
+/* ELEMENTOS */
 const startScreen = document.getElementById('startScreen');
 const stage = document.getElementById('stage');
 const video = document.getElementById('camera');
+const liveFrame = document.getElementById('liveFrame');
+
 const canvasPreview = document.getElementById('canvasPreview');
 const ctxPreview = canvasPreview.getContext('2d');
 const videoPreview = document.getElementById('videoPreview');
+
 const cameraUI = document.getElementById('cameraUI');
 const resultUI = document.getElementById('resultUI');
 const timerEl = document.getElementById('timer');
@@ -132,14 +155,15 @@ const switchBtn = document.getElementById('switchBtn');
 const downloadBtn = document.getElementById('downloadBtn');
 const newBtn = document.getElementById('newBtn');
 
+/* CANVAS FINAL */
 const canvasFinal = document.createElement('canvas');
 const ctxFinal = canvasFinal.getContext('2d');
 
+/* ESTADO */
 let stream, usingFront=true, isRecording=false;
 let recorder, chunks=[], startTime=0, animId;
-let downloadURL=null;
 
-/* ==== PRELOAD FRAMES ==== */
+/* FRAMES */
 const frames=[];
 for(let i=1;i<=TOTAL_FRAMES;i++){
     const img=new Image();
@@ -149,7 +173,7 @@ for(let i=1;i<=TOTAL_FRAMES;i++){
 let frameIndex=0;
 let lastFrameTime=0;
 
-/* ==== CAMERA ==== */
+/* CAMERA */
 async function initCamera(){
     if(stream) stream.getTracks().forEach(t=>t.stop());
     stream = await navigator.mediaDevices.getUserMedia({
@@ -161,9 +185,20 @@ async function initCamera(){
     video.play();
     startScreen.style.display='none';
     stage.style.display='block';
+    animateLiveFrame();
 }
 
-/* ==== DRAW ==== */
+/* ANIMA GIF AO VIVO */
+function animateLiveFrame(t=0){
+    if(t-lastFrameTime>1000/FRAME_FPS){
+        frameIndex=(frameIndex+1)%frames.length;
+        liveFrame.src = frames[frameIndex].src;
+        lastFrameTime=t;
+    }
+    requestAnimationFrame(animateLiveFrame);
+}
+
+/* DRAW VIDEO */
 function drawVideo(w,h){
     const vw=video.videoWidth, vh=video.videoHeight;
     if(!vw) return;
@@ -175,21 +210,12 @@ function drawVideo(w,h){
     ctxFinal.restore();
 }
 
-function drawFrame(w,h,t){
-    if(t-lastFrameTime>1000/FRAME_FPS){
-        frameIndex=(frameIndex+1)%frames.length;
-        lastFrameTime=t;
-    }
-    const img=frames[frameIndex];
-    if(img.complete) ctxFinal.drawImage(img,0,0,w,h);
-}
-
-/* ==== FOTO ==== */
+/* FOTO */
 photoBtn.onclick=()=>{
     canvasFinal.width=1080;
     canvasFinal.height=1920;
     drawVideo(1080,1920);
-    drawFrame(1080,1920,performance.now());
+    ctxFinal.drawImage(frames[frameIndex],0,0,1080,1920);
     canvasPreview.width=innerWidth;
     canvasPreview.height=innerHeight;
     ctxPreview.drawImage(canvasFinal,0,0,canvasPreview.width,canvasPreview.height);
@@ -197,7 +223,7 @@ photoBtn.onclick=()=>{
     showResult(canvasFinal.toDataURL(),"foto.png");
 };
 
-/* ==== VIDEO ==== */
+/* VIDEO */
 videoBtn.onclick=()=>isRecording?stopRecording():startRecording();
 
 function startRecording(){
@@ -209,15 +235,15 @@ function startRecording(){
     canvasFinal.width=720;
     canvasFinal.height=1280;
 
-    function loop(t){
+    function loop(){
         if(!isRecording) return;
         ctxFinal.clearRect(0,0,720,1280);
         drawVideo(720,1280);
-        drawFrame(720,1280,t);
+        ctxFinal.drawImage(frames[frameIndex],0,0,720,1280);
         updateTimer();
         animId=requestAnimationFrame(loop);
     }
-    loop(performance.now());
+    loop();
 
     const cs=canvasFinal.captureStream(30);
     stream.getAudioTracks().forEach(a=>cs.addTrack(a));
@@ -243,18 +269,17 @@ function finishVideo(){
     showResult(url,"video.webm");
 }
 
-/* ==== TIMER ==== */
+/* TIMER */
 function updateTimer(){
     const s=Math.floor((Date.now()-startTime)/1000);
     timerEl.textContent=`00:${String(s).padStart(2,'0')}`;
     if(s>=MAX_DURATION) stopRecording();
 }
 
-/* ==== RESULT ==== */
+/* RESULT */
 function showResult(url,name){
     cameraUI.style.display='none';
     resultUI.style.display='flex';
-    downloadURL=url;
     downloadBtn.onclick=()=>{
         const a=document.createElement('a');
         a.href=url;a.download=name;a.click();
