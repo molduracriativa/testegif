@@ -7,12 +7,29 @@
 
 <style>
 :root { --accent:#25D366; --record:#ff0000; }
-* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-body { margin:0; background:#000; color:#fff; overflow:hidden; width:100vw; height:100dvh; font-family:sans-serif; }
 
-.frame,.stage{position:relative;width:100%;height:100%;overflow:hidden;}
-#camera{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
-#canvasPreview,#videoPreview{position:absolute;inset:0;width:100%;height:100%;display:none;z-index:6;}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+body {
+  margin:0; background:#000; color:#fff;
+  overflow:hidden; width:100vw; height:100dvh;
+  font-family:sans-serif;
+}
+
+.frame,.stage{
+  position:relative;width:100%;height:100%;overflow:hidden;
+}
+
+#camera{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;
+}
+
+#canvasPreview,#videoPreview{
+  position:absolute;inset:0;width:100%;height:100%;
+  display:none;z-index:6;
+}
+
 #canvasFinal{display:none;}
 
 .ui-layer{
@@ -22,54 +39,90 @@ body { margin:0; background:#000; color:#fff; overflow:hidden; width:100vw; heig
   pointer-events:none;
 }
 
-.top-bar{display:flex;justify-content:space-between;pointer-events:auto;}
-.timer-badge{background:var(--record);padding:6px 14px;border-radius:14px;display:none;}
+.top-bar{
+  display:flex;justify-content:space-between;
+  pointer-events:auto;
+}
 
-.controls-bottom{display:flex;flex-direction:column;align-items:center;gap:30px;pointer-events:auto;}
-.capture-controls{display:flex;gap:20px;}
+.timer-badge{
+  background:var(--record);
+  padding:6px 14px;
+  border-radius:14px;
+  display:none;
+}
+
+.controls-bottom{
+  display:flex;flex-direction:column;
+  align-items:center;gap:30px;
+  pointer-events:auto;
+}
+
+.capture-controls{
+  display:flex;gap:20px;
+}
 
 .action-btn-mini,.action-btn-large{
-border-radius:50%;border:3px solid #fff;
-background:rgba(255,255,255,.2);
-display:flex;align-items:center;justify-content:center;
+  border-radius:50%;
+  border:3px solid #fff;
+  background:rgba(255,255,255,.2);
+  display:flex;align-items:center;justify-content:center;
 }
+
 .action-btn-mini{width:54px;height:54px;font-size:24px;}
 .action-btn-large{width:86px;height:86px;}
+
 .action-btn-large.recording{
-border-color:var(--record);
-background:rgba(255,0,0,.4);
+  border-color:var(--record);
+  background:rgba(255,0,0,.4);
 }
 
 #resultUI{
   display:none;
-  justify-content:flex-end;
+  flex-direction:column;
+  gap:14px;
   align-items:center;
-  gap:16px;
   pointer-events:auto;
 }
 
+/* BOTÕES RESULTADO */
 #resultUI button{
   font-size:20px;
-  padding:16px 28px;
+  padding:18px 36px;
   border:none;
-  border-radius:40px;
+  border-radius:50px;
+  cursor:pointer;
+}
+
+#downloadBtn{
   background:#ffffff;
   color:#000;
 }
 
-#startScreen{
-position:absolute;inset:0;
-background:url('capajpg.jpg') center/cover;
-display:flex;align-items:center;justify-content:center;
-z-index:50;
-}
-#startBtn{
-padding:18px 32px;font-size:20px;
-border:none;border-radius:50px;
-background:#FF5722;color:#fff;
+#shareBtn{
+  background:linear-gradient(135deg,#E1306C,#FD1D1D,#F77737);
+  color:#fff;
+  font-weight:600;
+  box-shadow:0 6px 20px rgba(0,0,0,.35);
 }
 
-.flash{position:absolute;inset:0;background:#fff;opacity:0;transition:.1s;z-index:10;}
+#startScreen{
+  position:absolute;inset:0;
+  background:url('capajpg.jpg') center/cover;
+  display:flex;align-items:center;justify-content:center;
+  z-index:50;
+}
+
+#startBtn{
+  padding:18px 32px;font-size:20px;
+  border:none;border-radius:50px;
+  background:#FF5722;color:#fff;
+}
+
+.flash{
+  position:absolute;inset:0;
+  background:#fff;opacity:0;
+  transition:.1s;z-index:10;
+}
 </style>
 </head>
 
@@ -100,6 +153,7 @@ background:#FF5722;color:#fff;
 </div>
 
 <div class="ui-layer" id="resultUI">
+  <button id="shareBtn">📤 Compartilhar</button>
   <button id="downloadBtn">📥 Baixar</button>
   <button id="newPhotoBtn">🔄 Novo</button>
 </div>
@@ -113,10 +167,10 @@ background:#FF5722;color:#fff;
 
 <script>
 /* === PNG SEQUENCE === */
-const TOTAL_FRAMES = 30;
-const FRAME_INTERVAL = 60;
-const frames = [];
-let frameIndex = 0, lastFrameTime = 0;
+const TOTAL_FRAMES=30;
+const FRAME_INTERVAL=60;
+const frames=[];
+let frameIndex=0,lastFrameTime=0;
 
 for(let i=1;i<=TOTAL_FRAMES;i++){
   const img=new Image();
@@ -136,8 +190,6 @@ const ctxFinal=canvasFinal.getContext('2d',{alpha:false});
 function previewLoop(t){
   canvasPreview.width=1080;
   canvasPreview.height=1920;
-  ctxPreview.fillStyle="#000";
-  ctxPreview.fillRect(0,0,1080,1920);
   drawVideo(ctxPreview,1080,1920);
   drawAnimatedFrame(ctxPreview,1080,1920,t);
   raf=requestAnimationFrame(previewLoop);
@@ -160,30 +212,19 @@ function drawVideo(ctx,w,h){
   ctx.drawImage(camera,(w-vw*r)/2,(h-vh*r)/2,vw*r,vh*r);
 }
 
-/* === FOTO (JPEG SOCIAL SAFE) === */
+/* === FOTO === */
 function takePhoto(){
-  cancelAnimationFrame(raf);
-
   canvasFinal.width=1080;
   canvasFinal.height=1920;
-  ctxFinal.fillStyle="#000";
-  ctxFinal.fillRect(0,0,1080,1920);
   drawVideo(ctxFinal,1080,1920);
   drawAnimatedFrame(ctxFinal,1080,1920,performance.now());
 
-  // 👉 MOSTRA PREVIEW DA FOTO
-  canvasPreview.width=1080;
-  canvasPreview.height=1920;
-  ctxPreview.drawImage(canvasFinal,0,0);
-
-  canvasFinal.toBlob(
-    b=>showResult('image',b),
-    'image/jpeg',
-    0.95
-  );
+  canvasFinal.toBlob(blob=>{
+    showResult('image',blob,'image/png');
+  },'image/png',0.95);
 }
 
-/* === VÍDEO (INALTERADO) === */
+/* === VÍDEO === */
 function startRecording(){
   isRecording=true;
   recordedChunks=[];
@@ -195,8 +236,7 @@ function startRecording(){
 
   function recordLoop(t){
     if(!isRecording)return;
-    ctxFinal.fillStyle="#000";
-    ctxFinal.fillRect(0,0,720,1280);
+    ctxFinal.clearRect(0,0,720,1280);
     drawVideo(ctxFinal,720,1280);
     drawAnimatedFrame(ctxFinal,720,1280,t);
     updateTimer();
@@ -211,7 +251,7 @@ function startRecording(){
   mediaRecorder.ondataavailable=e=>recordedChunks.push(e.data);
   mediaRecorder.onstop=()=>{
     const blob=new Blob(recordedChunks,{type:'video/webm'});
-    showResult('video',blob);
+    showResult('video',blob,'video/webm');
   };
   mediaRecorder.start();
 }
@@ -223,15 +263,21 @@ function stopRecording(){
 }
 
 /* === RESULTADO === */
-function showResult(type,blob){
-  canvasPreview.style.display='block';
+function showResult(type,blob,mime){
+  cancelAnimationFrame(raf);
+
+  canvasPreview.style.display='none';
   camera.style.display='none';
   cameraUI.style.display='none';
   resultUI.style.display='flex';
 
-  const ext=type==='image'?'jpg':'webm';
   const url=URL.createObjectURL(blob);
-  currentDownloadData={url,filename:`${type}_${Date.now()}.${ext}`};
+  currentDownloadData={
+    url,
+    blob,
+    filename:`${type}_${Date.now()}.${type==='image'?'png':'webm'}`,
+    mime
+  };
 
   if(type==='video'){
     videoPreview.src=url;
@@ -239,6 +285,28 @@ function showResult(type,blob){
     videoPreview.play();
   }
 }
+
+/* === COMPARTILHAR (CHAVE DO SUCESSO) === */
+shareBtn.onclick=async()=>{
+  if(!navigator.canShare||!currentDownloadData.blob){
+    alert("Compartilhamento não disponível.");
+    return;
+  }
+
+  const file=new File(
+    [currentDownloadData.blob],
+    currentDownloadData.filename,
+    {type:currentDownloadData.mime}
+  );
+
+  try{
+    await navigator.share({
+      files:[file],
+      title:"Compartilhar",
+      text:"Compartilhe direto para melhor qualidade"
+    });
+  }catch(e){}
+};
 
 /* === AUX === */
 function updateTimer(){
@@ -251,10 +319,12 @@ function resetCamera(){
   videoPreview.pause();
   videoPreview.src='';
   videoPreview.style.display='none';
+
   camera.style.display='block';
   canvasPreview.style.display='block';
   cameraUI.style.display='flex';
   resultUI.style.display='none';
+
   previewLoop(performance.now());
 }
 
@@ -265,6 +335,7 @@ function triggerDownload(){
   a.click();
 }
 
+/* === EVENTS === */
 downloadBtn.onclick=triggerDownload;
 newPhotoBtn.onclick=resetCamera;
 capturePhotoBtn.onclick=takePhoto;
@@ -272,6 +343,7 @@ captureVideoBtn.onclick=()=>isRecording?stopRecording():startRecording();
 switchBtn.onclick=()=>{usingFrontCamera=!usingFrontCamera;initCamera();};
 startBtn.onclick=()=>initCamera();
 
+/* === CAMERA === */
 async function initCamera(){
   stream&&stream.getTracks().forEach(t=>t.stop());
   stream=await navigator.mediaDevices.getUserMedia({
