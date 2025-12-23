@@ -6,153 +6,75 @@
 <title>Câmera 9:16 com Moldura Animada</title>
 
 <style>
-* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:none; }
-
-body {
-    background:#000;
-    overflow:hidden;
-    font-family:Arial, sans-serif;
-    width:100vw;
-    height:100dvh;
-}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:none;}
+body{background:#000;overflow:hidden;font-family:Arial,sans-serif;width:100vw;height:100dvh}
 
 /* CAPA */
-#startScreen {
-    position:fixed;
-    inset:0;
+#startScreen{
+    position:fixed;inset:0;
     background:url("capa.jpg") center/cover no-repeat;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
-    z-index:50;
-    text-align:center;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    z-index:50;text-align:center
 }
-
-#startBtn {
-    padding:18px 36px;
-    border-radius:50px;
-    border:none;
-    font-size:20px;
-    cursor:pointer;
-    background:#ff4d00;
-    color:#fff;
+#startBtn{
+    padding:18px 36px;border-radius:50px;border:none;
+    font-size:20px;cursor:pointer;background:#ff4d00;color:#fff
 }
 
 /* STAGE */
-#stage {
-    position:fixed;
-    inset:0;
-    background:#000;
-    display:none;
-}
+#stage{position:fixed;inset:0;background:#000;display:none}
 
 /* CAMERA */
-#camera {
-    position:absolute;
-    inset:0;
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    background:#000;
+#camera{
+    position:absolute;inset:0;width:100%;height:100%;
+    object-fit:cover;background:#000
 }
-
-#camera.mirror {
-    transform:scaleX(-1);
-}
+#camera.mirror{transform:scaleX(-1)}
 
 /* PREVIEW */
-#canvasPreview,
-#videoPreview {
-    position:absolute;
-    inset:0;
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    display:none;
-    z-index:10;
-    background:#000;
+#canvasPreview,#videoPreview{
+    position:absolute;inset:0;width:100%;height:100%;
+    object-fit:contain;background:#000;
+    display:none;z-index:10
 }
 
 /* UI */
-.ui {
-    position:absolute;
-    inset:0;
-    z-index:20;
-    display:flex;
-    flex-direction:column;
-    justify-content:space-between;
-    padding:20px;
-    pointer-events:none;
+.ui{
+    position:absolute;inset:0;z-index:20;
+    display:flex;flex-direction:column;
+    justify-content:space-between;padding:20px;
+    pointer-events:none
 }
-
-.top {
-    display:flex;
-    justify-content:space-between;
-    pointer-events:auto;
+.top{display:flex;justify-content:space-between;pointer-events:auto}
+.timer{
+    background:red;padding:6px 14px;border-radius:14px;
+    font-weight:bold;display:none
 }
-
-.timer {
-    background:red;
-    padding:6px 14px;
-    border-radius:14px;
-    font-weight:bold;
-    display:none;
+.bottom{
+    display:flex;justify-content:center;gap:25px;
+    pointer-events:auto
 }
-
-.bottom {
-    display:flex;
-    justify-content:center;
-    gap:25px;
-    pointer-events:auto;
+.btn{
+    width:60px;height:60px;border-radius:50%;
+    border:2px solid #fff;background:rgba(255,255,255,.2);
+    color:#fff;font-size:24px;cursor:pointer
 }
+.btn.recording{background:red}
+.big{width:80px;height:80px;border-width:4px}
 
-.btn {
-    width:60px;
-    height:60px;
-    border-radius:50%;
-    border:2px solid #fff;
-    background:rgba(255,255,255,.2);
-    color:#fff;
-    font-size:24px;
-    cursor:pointer;
+/* RESULT */
+.result{
+    position:absolute;inset:0;z-index:30;
+    display:none;flex-direction:column;
+    justify-content:flex-end;align-items:center;
+    padding:30px;gap:15px;background:#000
 }
-
-.btn.recording {
-    background:red;
+.result button{
+    width:100%;max-width:280px;padding:14px;
+    font-size:16px;border:none;border-radius:12px;cursor:pointer
 }
-
-.big {
-    width:80px;
-    height:80px;
-    border-width:4px;
-}
-
-.result {
-    position:absolute;
-    inset:0;
-    z-index:30;
-    display:none;
-    flex-direction:column;
-    justify-content:flex-end;
-    align-items:center;
-    padding:30px;
-    gap:15px;
-    background:#000;
-}
-
-.result button {
-    width:100%;
-    max-width:280px;
-    padding:14px;
-    font-size:16px;
-    border:none;
-    border-radius:12px;
-    cursor:pointer;
-}
-
-.save { background:#25D366; color:#fff; }
-.new { background:#555; color:#fff; }
+.save{background:#25D366;color:#fff}
+.new{background:#555;color:#fff}
 </style>
 </head>
 
@@ -160,15 +82,13 @@ body {
 
 <!-- CAPA -->
 <div id="startScreen">
-    <h2 style="color:#fff; text-shadow:0 0 6px #000">Permita a câmera</h2>
+    <h2 style="color:#fff;text-shadow:0 0 6px #000">Permita a câmera</h2>
     <button id="startBtn">INICIAR</button>
 </div>
 
 <!-- STAGE -->
 <div id="stage">
-
     <video id="camera" autoplay playsinline muted></video>
-
     <canvas id="canvasPreview"></canvas>
     <video id="videoPreview" controls playsinline></video>
 
@@ -177,7 +97,6 @@ body {
             <button class="btn" id="switchBtn">🔄</button>
             <div class="timer" id="timer">00:00</div>
         </div>
-
         <div class="bottom">
             <button class="btn" id="photoBtn">📷</button>
             <button class="btn big" id="videoBtn">🎥</button>
@@ -188,23 +107,21 @@ body {
         <button class="save" id="downloadBtn">📥 Baixar</button>
         <button class="new" id="newBtn">🔄 Novo</button>
     </div>
-
 </div>
 
 <script>
-/* CONFIG */
+/* ================= CONFIG ================= */
 const TOTAL_FRAMES = 30;
-const FRAME_INTERVAL = 100;
-const MAX_DURATION = 60;
+const FRAME_FPS = 20;        // 🔥 CONTROLE DE VELOCIDADE
+const MAX_DURATION = 60;    // segundos
+/* ========================================== */
 
-/* ELEMENTOS */
 const startScreen = document.getElementById('startScreen');
 const stage = document.getElementById('stage');
 const video = document.getElementById('camera');
 const canvasPreview = document.getElementById('canvasPreview');
 const ctxPreview = canvasPreview.getContext('2d');
 const videoPreview = document.getElementById('videoPreview');
-
 const cameraUI = document.getElementById('cameraUI');
 const resultUI = document.getElementById('resultUI');
 const timerEl = document.getElementById('timer');
@@ -215,176 +132,148 @@ const switchBtn = document.getElementById('switchBtn');
 const downloadBtn = document.getElementById('downloadBtn');
 const newBtn = document.getElementById('newBtn');
 
-/* CANVAS FINAL */
 const canvasFinal = document.createElement('canvas');
 const ctxFinal = canvasFinal.getContext('2d');
 
-/* ESTADO */
-let stream;
-let usingFront = true;
-let isRecording = false;
-let recorder;
-let chunks = [];
-let startTime = 0;
-let animId;
+let stream, usingFront=true, isRecording=false;
+let recorder, chunks=[], startTime=0, animId;
+let downloadURL=null;
 
-/* FRAMES */
-let frame = 1;
-let lastFrame = 0;
-const frameImg = new Image();
+/* ==== PRELOAD FRAMES ==== */
+const frames=[];
+for(let i=1;i<=TOTAL_FRAMES;i++){
+    const img=new Image();
+    img.src=`assets/frame_${i}.png`;
+    frames.push(img);
+}
+let frameIndex=0;
+let lastFrameTime=0;
 
-/* CAMERA */
-async function initCamera() {
-    if (stream) stream.getTracks().forEach(t => t.stop());
-
+/* ==== CAMERA ==== */
+async function initCamera(){
+    if(stream) stream.getTracks().forEach(t=>t.stop());
     stream = await navigator.mediaDevices.getUserMedia({
-        video:{ facingMode: usingFront ? 'user':'environment' },
+        video:{facingMode:usingFront?'user':'environment'},
         audio:true
     });
-
-    video.srcObject = stream;
-    video.classList.toggle('mirror', usingFront);
+    video.srcObject=stream;
+    video.classList.toggle('mirror',usingFront);
     video.play();
-
-    startScreen.style.display = 'none';
-    stage.style.display = 'block';
+    startScreen.style.display='none';
+    stage.style.display='block';
 }
 
-/* ANIMA FRAME */
-function updateFrame(t) {
-    if (t - lastFrame > FRAME_INTERVAL) {
-        frame = frame % TOTAL_FRAMES + 1;
-        frameImg.src = `assets/frame_${frame}.png`;
-        lastFrame = t;
-    }
-}
-
-function drawFrame(w,h){
-    if (frameImg.complete)
-        ctxFinal.drawImage(frameImg,0,0,w,h);
-}
-
-/* DRAW VIDEO */
+/* ==== DRAW ==== */
 function drawVideo(w,h){
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
+    const vw=video.videoWidth, vh=video.videoHeight;
     if(!vw) return;
-
-    const r = Math.max(w/vw, h/vh);
-    const nw = vw*r;
-    const nh = vh*r;
-
+    const r=Math.max(w/vw,h/vh);
+    const nw=vw*r, nh=vh*r;
     ctxFinal.save();
-    if(usingFront){
-        ctxFinal.translate(w,0);
-        ctxFinal.scale(-1,1);
-    }
+    if(usingFront){ctxFinal.translate(w,0);ctxFinal.scale(-1,1);}
     ctxFinal.drawImage(video,(w-nw)/2,(h-nh)/2,nw,nh);
     ctxFinal.restore();
 }
 
-/* FOTO */
-photoBtn.onclick = ()=>{
-    canvasFinal.width = 1080;
-    canvasFinal.height = 1920;
+function drawFrame(w,h,t){
+    if(t-lastFrameTime>1000/FRAME_FPS){
+        frameIndex=(frameIndex+1)%frames.length;
+        lastFrameTime=t;
+    }
+    const img=frames[frameIndex];
+    if(img.complete) ctxFinal.drawImage(img,0,0,w,h);
+}
 
+/* ==== FOTO ==== */
+photoBtn.onclick=()=>{
+    canvasFinal.width=1080;
+    canvasFinal.height=1920;
     drawVideo(1080,1920);
-    drawFrame(1080,1920);
-
-    canvasPreview.width = innerWidth;
-    canvasPreview.height = innerHeight;
+    drawFrame(1080,1920,performance.now());
+    canvasPreview.width=innerWidth;
+    canvasPreview.height=innerHeight;
     ctxPreview.drawImage(canvasFinal,0,0,canvasPreview.width,canvasPreview.height);
-
-    canvasPreview.style.display = 'block';
-    showResult(canvasFinal.toDataURL());
+    canvasPreview.style.display='block';
+    showResult(canvasFinal.toDataURL(),"foto.png");
 };
 
-/* VIDEO */
-videoBtn.onclick = ()=>{
-    if(isRecording) stopRecording();
-    else startRecording();
-};
+/* ==== VIDEO ==== */
+videoBtn.onclick=()=>isRecording?stopRecording():startRecording();
 
 function startRecording(){
-    isRecording = true;
+    isRecording=true;
     videoBtn.classList.add('recording');
-    timerEl.style.display = 'block';
-    startTime = Date.now();
-    chunks = [];
-
-    canvasFinal.width = 720;
-    canvasFinal.height = 1280;
+    timerEl.style.display='block';
+    startTime=Date.now();
+    chunks=[];
+    canvasFinal.width=720;
+    canvasFinal.height=1280;
 
     function loop(t){
         if(!isRecording) return;
         ctxFinal.clearRect(0,0,720,1280);
         drawVideo(720,1280);
-        updateFrame(t);
-        drawFrame(720,1280);
+        drawFrame(720,1280,t);
         updateTimer();
-        animId = requestAnimationFrame(loop);
+        animId=requestAnimationFrame(loop);
     }
-    loop();
+    loop(performance.now());
 
-    const streamCanvas = canvasFinal.captureStream(30);
-    stream.getAudioTracks().forEach(a=>streamCanvas.addTrack(a));
-
-    recorder = new MediaRecorder(streamCanvas,{mimeType:'video/webm'});
-    recorder.ondataavailable = e=>chunks.push(e.data);
-    recorder.onstop = finishVideo;
+    const cs=canvasFinal.captureStream(30);
+    stream.getAudioTracks().forEach(a=>cs.addTrack(a));
+    recorder=new MediaRecorder(cs,{mimeType:'video/webm'});
+    recorder.ondataavailable=e=>chunks.push(e.data);
+    recorder.onstop=finishVideo;
     recorder.start();
 }
 
 function stopRecording(){
-    isRecording = false;
+    isRecording=false;
     cancelAnimationFrame(animId);
+    recorder.stop();
     videoBtn.classList.remove('recording');
     timerEl.style.display='none';
-    recorder.stop();
 }
 
 function finishVideo(){
-    const blob = new Blob(chunks,{type:'video/webm'});
-    videoPreview.src = URL.createObjectURL(blob);
+    const blob=new Blob(chunks,{type:'video/webm'});
+    const url=URL.createObjectURL(blob);
+    videoPreview.src=url;
     videoPreview.style.display='block';
-    showResult(videoPreview.src,blob);
+    showResult(url,"video.webm");
 }
 
-/* TIMER */
+/* ==== TIMER ==== */
 function updateTimer(){
-    const s = Math.floor((Date.now()-startTime)/1000);
-    timerEl.textContent = `00:${String(s).padStart(2,'0')}`;
+    const s=Math.floor((Date.now()-startTime)/1000);
+    timerEl.textContent=`00:${String(s).padStart(2,'0')}`;
     if(s>=MAX_DURATION) stopRecording();
 }
 
-/* RESULT */
-let currentURL;
-function showResult(url,blob){
+/* ==== RESULT ==== */
+function showResult(url,name){
     cameraUI.style.display='none';
     resultUI.style.display='flex';
-    currentURL = url;
-    downloadBtn.onclick = ()=>{
+    downloadURL=url;
+    downloadBtn.onclick=()=>{
         const a=document.createElement('a');
-        a.href=url;
-        a.download = blob ? 'video.webm':'foto.png';
-        a.click();
+        a.href=url;a.download=name;a.click();
     }
 }
 
-newBtn.onclick = ()=>{
+newBtn.onclick=()=>{
     resultUI.style.display='none';
     cameraUI.style.display='flex';
     canvasPreview.style.display='none';
     videoPreview.style.display='none';
 };
 
-/* SWITCH */
-switchBtn.onclick = ()=>{
-    usingFront = !usingFront;
+switchBtn.onclick=()=>{
+    usingFront=!usingFront;
     initCamera();
 };
 
-startBtn.onclick = initCamera;
+startBtn.onclick=initCamera;
 </script>
 
 </body>
