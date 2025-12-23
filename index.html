@@ -6,34 +6,31 @@
 <title>Câmera com Moldura Animada</title>
 
 <style>
-/* === CSS ORIGINAL — NÃO ALTERADO === */
 :root { --accent:#25D366; --record:#ff0000; }
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 body { margin:0; background:#000; color:#fff; overflow:hidden; width:100vw; height:100dvh; font-family:sans-serif; }
 
-.frame, .stage { position:relative; width:100%; height:100%; overflow:hidden; }
-#camera { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:.3s; }
-#camera.mirrored { transform:scaleX(-1); }
+.frame,.stage{position:relative;width:100%;height:100%;overflow:hidden;}
+#camera{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+#canvasPreview,#videoPreview{position:absolute;inset:0;width:100%;height:100%;display:none;z-index:6;}
+#canvasFinal{display:none;}
 
-#canvasPreview,#videoPreview { position:absolute; inset:0; width:100%; height:100%; display:none; z-index:6; background:#000; }
-#canvasFinal { display:none; }
+.ui-layer{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:space-between;padding:20px;pointer-events:none;}
+.top-bar{display:flex;justify-content:space-between;pointer-events:auto;}
+.timer-badge{background:var(--record);padding:5px 12px;border-radius:12px;display:none;}
 
-.ui-layer { position:absolute; inset:0; z-index:20; display:flex; flex-direction:column; justify-content:space-between; padding:20px; pointer-events:none; }
-.top-bar { display:flex; justify-content:space-between; pointer-events:auto; }
-.timer-badge { background:var(--record); padding:5px 12px; border-radius:12px; display:none; }
+.controls-bottom{display:flex;flex-direction:column;align-items:center;gap:30px;pointer-events:auto;}
+.capture-controls{display:flex;gap:20px;}
 
-.controls-bottom { display:flex; flex-direction:column; align-items:center; gap:30px; pointer-events:auto; }
-.capture-controls { display:flex; gap:20px; }
-
-.action-btn-mini,.action-btn-large {
-border-radius:50%; border:3px solid #fff; background:rgba(255,255,255,.2);
-display:flex; align-items:center; justify-content:center; cursor:pointer;
+.action-btn-mini,.action-btn-large{
+border-radius:50%;border:3px solid #fff;background:rgba(255,255,255,.2);
+display:flex;align-items:center;justify-content:center;
 }
 .action-btn-mini{width:50px;height:50px;font-size:24px;}
 .action-btn-large{width:80px;height:80px;}
 .action-btn-large.recording{border-color:var(--record);background:rgba(255,0,0,.4);}
 
-#startScreen{position:absolute;inset:0;background:url('capajpg.jpg') center/cover;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:50;}
+#startScreen{position:absolute;inset:0;background:url('capajpg.jpg') center/cover;display:flex;align-items:center;justify-content:center;z-index:50;}
 #startBtn{padding:18px 32px;font-size:20px;border:none;border-radius:50px;background:#FF5722;color:#fff;}
 
 .flash{position:absolute;inset:0;background:#fff;opacity:0;transition:.1s;z-index:10;}
@@ -43,7 +40,7 @@ display:flex; align-items:center; justify-content:center; cursor:pointer;
 <body>
 
 <div class="frame">
-<div class="stage" id="stage">
+<div class="stage">
 
 <video id="camera" autoplay playsinline muted></video>
 <canvas id="canvasPreview"></canvas>
@@ -79,12 +76,11 @@ display:flex; align-items:center; justify-content:center; cursor:pointer;
 </div>
 
 <script>
-/* === MOLDURA ANIMADA === */
+/* === PNG SEQUENCE === */
 const TOTAL_FRAMES = 30;
-const FRAME_INTERVAL = 80; // ← ajuste velocidade aqui
-const frames = [];
-let frameIndex = 0;
-let lastFrameTime = 0;
+const FRAME_INTERVAL = 60; // 👈 ajuste velocidade aqui
+const frames=[];
+let frameIndex=0,lastFrameTime=0;
 
 for(let i=1;i<=TOTAL_FRAMES;i++){
 const img=new Image();
@@ -92,42 +88,45 @@ img.src=`assets/frame_${i}.png`;
 frames.push(img);
 }
 
-/* === VARIÁVEIS ORIGINAIS === */
-let stream,isRecording=false,mediaRecorder,recordedChunks=[],animationFrameId;
+/* === VARIÁVEIS === */
+let stream,isRecording=false,mediaRecorder,recordedChunks=[],raf;
 let usingFrontCamera=true,recordingStartTime=0;
 let currentDownloadData={};
 
-const video=camera,ctxFinal=canvasFinal.getContext('2d',{alpha:false});
 const ctxPreview=canvasPreview.getContext('2d');
+const ctxFinal=canvasFinal.getContext('2d',{alpha:false});
 
-startBtn.onclick=()=>initCamera(true);
-switchBtn.onclick=()=>switchCamera();
-newPhotoBtn.onclick=resetCamera;
-capturePhotoBtn.onclick=takePhoto;
-captureVideoBtn.onclick=()=>isRecording?stopRecording():startRecording();
+/* === LOOP PREVIEW COM MOLDURA === */
+function previewLoop(t){
+canvasPreview.width=1080;
+canvasPreview.height=1920;
 
-/* === DESENHO COM FRAME ANIMADO === */
-function drawAnimatedFrame(ctx,w,h,time){
-if(time-lastFrameTime>FRAME_INTERVAL){
+drawVideo(ctxPreview,1080,1920);
+drawAnimatedFrame(ctxPreview,1080,1920,t);
+raf=requestAnimationFrame(previewLoop);
+}
+
+/* === DESENHO === */
+function drawAnimatedFrame(ctx,w,h,t){
+if(t-lastFrameTime>FRAME_INTERVAL){
 frameIndex=(frameIndex+1)%TOTAL_FRAMES;
-lastFrameTime=time;
+lastFrameTime=t;
 }
 const img=frames[frameIndex];
 if(img.complete) ctx.drawImage(img,0,0,w,h);
 }
 
 function drawVideo(ctx,w,h){
-const vw=video.videoWidth,vh=video.videoHeight;
+const vw=camera.videoWidth,vh=camera.videoHeight;
 if(!vw||!vh)return;
 const r=Math.max(w/vw,h/vh);
-const nw=vw*r,nh=vh*r;
-ctx.drawImage(video,(w-nw)/2,(h-nh)/2,nw,nh);
+ctx.drawImage(camera,(w-vw*r)/2,(h-vh*r)/2,vw*r,vh*r);
 }
 
 /* === FOTO === */
 function takePhoto(){
-flashEffect();
-canvasFinal.width=1080;canvasFinal.height=1920;
+canvasFinal.width=1080;
+canvasFinal.height=1920;
 drawVideo(ctxFinal,1080,1920);
 drawAnimatedFrame(ctxFinal,1080,1920,performance.now());
 canvasFinal.toBlob(b=>showResult('image',b),'image/png');
@@ -135,24 +134,26 @@ canvasFinal.toBlob(b=>showResult('image',b),'image/png');
 
 /* === VÍDEO === */
 function startRecording(){
-isRecording=true;recordedChunks=[];
+isRecording=true;
+recordedChunks=[];
 recordingTimer.style.display='block';
 recordingStartTime=Date.now();
-canvasFinal.width=720;canvasFinal.height=1280;
 
-function loop(t){
+canvasFinal.width=720;
+canvasFinal.height=1280;
+
+function recordLoop(t){
 if(!isRecording)return;
 ctxFinal.clearRect(0,0,720,1280);
 drawVideo(ctxFinal,720,1280);
 drawAnimatedFrame(ctxFinal,720,1280,t);
 updateTimer();
-animationFrameId=requestAnimationFrame(loop);
+requestAnimationFrame(recordLoop);
 }
-loop();
+recordLoop();
 
-const streamCanvas=canvasFinal.captureStream(30);
-stream.getAudioTracks().forEach(t=>streamCanvas.addTrack(t));
-mediaRecorder=new MediaRecorder(streamCanvas,{mimeType:'video/webm'});
+const s=canvasFinal.captureStream(30);
+mediaRecorder=new MediaRecorder(s,{mimeType:'video/webm'});
 mediaRecorder.ondataavailable=e=>recordedChunks.push(e.data);
 mediaRecorder.onstop=()=>{
 const blob=new Blob(recordedChunks,{type:'video/webm'});
@@ -163,51 +164,67 @@ mediaRecorder.start();
 
 function stopRecording(){
 isRecording=false;
-cancelAnimationFrame(animationFrameId);
 mediaRecorder.stop();
 recordingTimer.style.display='none';
 }
 
 /* === RESULTADO === */
 function showResult(type,blob){
+cancelAnimationFrame(raf);
+canvasPreview.style.display='none';
 camera.style.display='none';
 cameraUI.style.display='none';
 resultUI.style.display='flex';
+
 const url=URL.createObjectURL(blob);
 currentDownloadData={url,filename:`${type}_${Date.now()}.${type==='image'?'png':'webm'}`};
-(type==='image'?canvasPreview:videoPreview).style.display='block';
-if(type==='video') videoPreview.src=url;
+
+if(type==='video'){videoPreview.src=url;videoPreview.style.display='block';}
 }
 
 /* === AUX === */
-function flashEffect(){flash.style.opacity=1;setTimeout(()=>flash.style.opacity=0,150);}
 function updateTimer(){
-const d=Math.floor((Date.now()-recordingStartTime)/1000);
-recordingTimer.innerText=`00:${String(d).padStart(2,'0')}`;
+const s=Math.floor((Date.now()-recordingStartTime)/1000);
+recordingTimer.innerText=`00:${String(s).padStart(2,'0')}`;
 }
+
 function resetCamera(){
 URL.revokeObjectURL(currentDownloadData.url||'');
 videoPreview.src='';
+videoPreview.style.display='none';
 camera.style.display='block';
+canvasPreview.style.display='block';
 cameraUI.style.display='flex';
 resultUI.style.display='none';
+previewLoop(performance.now());
 }
+
 function triggerDownload(){
 const a=document.createElement('a');
 a.href=currentDownloadData.url;
 a.download=currentDownloadData.filename;
 a.click();
 }
+
 downloadBtn.onclick=triggerDownload;
+newPhotoBtn.onclick=resetCamera;
+capturePhotoBtn.onclick=takePhoto;
+captureVideoBtn.onclick=()=>isRecording?stopRecording():startRecording();
+switchBtn.onclick=()=>{usingFrontCamera=!usingFrontCamera;initCamera();};
+startBtn.onclick=()=>initCamera();
 
-async function initCamera(audio=true){
+async function initCamera(){
 stream&&stream.getTracks().forEach(t=>t.stop());
-stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:usingFrontCamera?'user':'environment'},audio});
+stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:usingFrontCamera?'user':'environment'}});
 camera.srcObject=stream;
-camera.onloadedmetadata=()=>{camera.play();startScreen.style.display='none';cameraUI.style.display='flex';};
+camera.onloadedmetadata=()=>{
+camera.play();
+startScreen.style.display='none';
+cameraUI.style.display='flex';
+canvasPreview.style.display='block';
+previewLoop(performance.now());
+};
 }
-function switchCamera(){usingFrontCamera=!usingFrontCamera;initCamera(true);}
 </script>
-
 </body>
 </html>
