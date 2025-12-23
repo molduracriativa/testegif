@@ -2,179 +2,389 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Câmera Profissional MP4</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Câmera 9:16 com Moldura Animada</title>
 
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#000;overflow:hidden;font-family:Arial}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:none; }
+
+body {
+    background:#000;
+    overflow:hidden;
+    font-family:Arial, sans-serif;
+    width:100vw;
+    height:100dvh;
+}
 
 /* CAPA */
-#startScreen{position:fixed;inset:0;background:url("capa.jpg") center/cover no-repeat;
-display:flex;justify-content:center;align-items:center;z-index:10}
-#startBtn{padding:16px 32px;border-radius:40px;border:none;font-size:18px}
+#startScreen {
+    position:fixed;
+    inset:0;
+    background:url("capa.jpg") center/cover no-repeat;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    z-index:50;
+    text-align:center;
+}
+
+#startBtn {
+    padding:18px 36px;
+    border-radius:50px;
+    border:none;
+    font-size:20px;
+    cursor:pointer;
+    background:#ff4d00;
+    color:#fff;
+}
+
+/* STAGE */
+#stage {
+    position:fixed;
+    inset:0;
+    background:#000;
+    display:none;
+}
 
 /* CAMERA */
-#cameraContainer{position:fixed;inset:0;display:none}
-video{width:100%;height:100%;object-fit:cover}
+#camera {
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    background:#000;
+}
 
-/* FRAME */
-#frame{position:absolute;inset:0;pointer-events:none}
-#frame img{width:100%;height:100%;object-fit:cover}
-
-/* ICONES */
-.icon{position:absolute;top:20px;left:20px;font-size:26px;color:#fff;z-index:5;display:none}
-
-/* CONTROLES */
-.controls{position:absolute;bottom:30px;width:100%;display:flex;justify-content:space-around;z-index:5}
-.controls button{width:72px;height:72px;border-radius:50%;border:none;font-size:20px}
-
-/* RECORD */
-#recordBtn{background:red;position:relative}
-#recordBtn.recording{background:#111}
-#progress{position:absolute;inset:-6px;border-radius:50%}
+#camera.mirror {
+    transform:scaleX(-1);
+}
 
 /* PREVIEW */
-#preview{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:20}
-#preview video,#preview img{width:100%;height:100%;object-fit:cover}
-#previewButtons{position:absolute;bottom:20px;width:100%;display:flex;justify-content:space-around}
-#previewButtons button{padding:14px 26px;border-radius:30px;border:none;font-size:16px}
-#loading{position:absolute;inset:0;display:none;justify-content:center;align-items:center;
-color:#fff;font-size:18px;background:#000c;z-index:30}
+#canvasPreview,
+#videoPreview {
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:none;
+    z-index:10;
+    background:#000;
+}
+
+/* UI */
+.ui {
+    position:absolute;
+    inset:0;
+    z-index:20;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    padding:20px;
+    pointer-events:none;
+}
+
+.top {
+    display:flex;
+    justify-content:space-between;
+    pointer-events:auto;
+}
+
+.timer {
+    background:red;
+    padding:6px 14px;
+    border-radius:14px;
+    font-weight:bold;
+    display:none;
+}
+
+.bottom {
+    display:flex;
+    justify-content:center;
+    gap:25px;
+    pointer-events:auto;
+}
+
+.btn {
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    border:2px solid #fff;
+    background:rgba(255,255,255,.2);
+    color:#fff;
+    font-size:24px;
+    cursor:pointer;
+}
+
+.btn.recording {
+    background:red;
+}
+
+.big {
+    width:80px;
+    height:80px;
+    border-width:4px;
+}
+
+.result {
+    position:absolute;
+    inset:0;
+    z-index:30;
+    display:none;
+    flex-direction:column;
+    justify-content:flex-end;
+    align-items:center;
+    padding:30px;
+    gap:15px;
+    background:#000;
+}
+
+.result button {
+    width:100%;
+    max-width:280px;
+    padding:14px;
+    font-size:16px;
+    border:none;
+    border-radius:12px;
+    cursor:pointer;
+}
+
+.save { background:#25D366; color:#fff; }
+.new { background:#555; color:#fff; }
 </style>
 </head>
 
 <body>
 
-<div id="startScreen"><button id="startBtn">Iniciar</button></div>
-
-<div id="cameraContainer">
-  <video id="video" autoplay playsinline muted></video>
-  <div id="frame"><img id="frameImg" src="assets/frame_1.png"></div>
-  <div id="videoIcon" class="icon">🎥</div>
-  <div id="photoIcon" class="icon">📸</div>
-
-  <div class="controls">
-    <button id="photoBtn">📸</button>
-    <button id="recordBtn">●</button>
-  </div>
+<!-- CAPA -->
+<div id="startScreen">
+    <h2 style="color:#fff; text-shadow:0 0 6px #000">Permita a câmera</h2>
+    <button id="startBtn">INICIAR</button>
 </div>
 
-<div id="preview">
-  <video id="previewVideo" controls></video>
-  <img id="previewImg">
-  <div id="previewButtons">
-    <button id="cancelBtn">Refazer</button>
-    <button id="saveBtn">Salvar</button>
-  </div>
+<!-- STAGE -->
+<div id="stage">
+
+    <video id="camera" autoplay playsinline muted></video>
+
+    <canvas id="canvasPreview"></canvas>
+    <video id="videoPreview" controls playsinline></video>
+
+    <div class="ui" id="cameraUI">
+        <div class="top">
+            <button class="btn" id="switchBtn">🔄</button>
+            <div class="timer" id="timer">00:00</div>
+        </div>
+
+        <div class="bottom">
+            <button class="btn" id="photoBtn">📷</button>
+            <button class="btn big" id="videoBtn">🎥</button>
+        </div>
+    </div>
+
+    <div class="result" id="resultUI">
+        <button class="save" id="downloadBtn">📥 Baixar</button>
+        <button class="new" id="newBtn">🔄 Novo</button>
+    </div>
+
 </div>
-
-<div id="loading">Convertendo para MP4…</div>
-
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js"></script>
 
 <script>
-const video=document.getElementById("video");
-const frameImg=document.getElementById("frameImg");
-const preview=document.getElementById("preview");
-const previewVideo=document.getElementById("previewVideo");
-const loading=document.getElementById("loading");
+/* CONFIG */
+const TOTAL_FRAMES = 30;
+const FRAME_INTERVAL = 100;
+const MAX_DURATION = 60;
 
-const canvas=document.createElement("canvas");
-canvas.width=1080;canvas.height=1920;
-const ctx=canvas.getContext("2d");
+/* ELEMENTOS */
+const startScreen = document.getElementById('startScreen');
+const stage = document.getElementById('stage');
+const video = document.getElementById('camera');
+const canvasPreview = document.getElementById('canvasPreview');
+const ctxPreview = canvasPreview.getContext('2d');
+const videoPreview = document.getElementById('videoPreview');
 
-let stream,mediaRecorder,chunks=[],recording=false;
-let rafId,startTime;
-const MAX_TIME=60000;
+const cameraUI = document.getElementById('cameraUI');
+const resultUI = document.getElementById('resultUI');
+const timerEl = document.getElementById('timer');
+
+const photoBtn = document.getElementById('photoBtn');
+const videoBtn = document.getElementById('videoBtn');
+const switchBtn = document.getElementById('switchBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const newBtn = document.getElementById('newBtn');
+
+/* CANVAS FINAL */
+const canvasFinal = document.createElement('canvas');
+const ctxFinal = canvasFinal.getContext('2d');
+
+/* ESTADO */
+let stream;
+let usingFront = true;
+let isRecording = false;
+let recorder;
+let chunks = [];
+let startTime = 0;
+let animId;
 
 /* FRAMES */
-let f=1;
-setInterval(()=>{f=f<30?f+1:1;frameImg.src=`assets/frame_${f}.png`},100);
+let frame = 1;
+let lastFrame = 0;
+const frameImg = new Image();
 
 /* CAMERA */
-async function startCamera(){
-  stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-  video.srcObject=stream;await video.play();
-}
-startBtn.onclick=async()=>{
-  startScreen.style.display="none";
-  cameraContainer.style.display="block";
-  await startCamera();
+async function initCamera() {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+
+    stream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode: usingFront ? 'user':'environment' },
+        audio:true
+    });
+
+    video.srcObject = stream;
+    video.classList.toggle('mirror', usingFront);
+    video.play();
+
+    startScreen.style.display = 'none';
+    stage.style.display = 'block';
 }
 
-/* DRAW */
-function draw(){
-  const vw=video.videoWidth,vh=video.videoHeight;
-  if(!vw)return;
-  const s=Math.max(1080/vw,1920/vh);
-  ctx.clearRect(0,0,1080,1920);
-  ctx.drawImage(video,(1080-vw*s)/2,(1920-vh*s)/2,vw*s,vh*s);
-  ctx.drawImage(frameImg,0,0,1080,1920);
+/* ANIMA FRAME */
+function updateFrame(t) {
+    if (t - lastFrame > FRAME_INTERVAL) {
+        frame = frame % TOTAL_FRAMES + 1;
+        frameImg.src = `assets/frame_${frame}.png`;
+        lastFrame = t;
+    }
+}
+
+function drawFrame(w,h){
+    if (frameImg.complete)
+        ctxFinal.drawImage(frameImg,0,0,w,h);
+}
+
+/* DRAW VIDEO */
+function drawVideo(w,h){
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if(!vw) return;
+
+    const r = Math.max(w/vw, h/vh);
+    const nw = vw*r;
+    const nh = vh*r;
+
+    ctxFinal.save();
+    if(usingFront){
+        ctxFinal.translate(w,0);
+        ctxFinal.scale(-1,1);
+    }
+    ctxFinal.drawImage(video,(w-nw)/2,(h-nh)/2,nw,nh);
+    ctxFinal.restore();
 }
 
 /* FOTO */
-photoBtn.onclick=()=>{
-  draw();
-  previewImg.src=canvas.toDataURL("image/png");
-  previewImg.style.display="block";
-  previewVideo.style.display="none";
-  preview.style.display="flex";
-}
+photoBtn.onclick = ()=>{
+    canvasFinal.width = 1080;
+    canvasFinal.height = 1920;
 
-/* VIDEO */
-recordBtn.onclick=()=>{
-  if(!recording){
-    recording=true;chunks=[];startTime=Date.now();
-    const out=canvas.captureStream(30);
-    stream.getAudioTracks().forEach(t=>out.addTrack(t));
-    mediaRecorder=new MediaRecorder(out,{mimeType:"video/webm"});
-    mediaRecorder.ondataavailable=e=>chunks.push(e.data);
-    mediaRecorder.onstop=convertMP4;
-    mediaRecorder.start();
-    render();
-  }else{
-    recording=false;
-    cancelAnimationFrame(rafId);
-    mediaRecorder.stop();
-  }
+    drawVideo(1080,1920);
+    drawFrame(1080,1920);
+
+    canvasPreview.width = innerWidth;
+    canvasPreview.height = innerHeight;
+    ctxPreview.drawImage(canvasFinal,0,0,canvasPreview.width,canvasPreview.height);
+
+    canvasPreview.style.display = 'block';
+    showResult(canvasFinal.toDataURL());
 };
 
-function render(){
-  draw();
-  if(Date.now()-startTime>=MAX_TIME)mediaRecorder.stop();
-  if(recording)rafId=requestAnimationFrame(render);
+/* VIDEO */
+videoBtn.onclick = ()=>{
+    if(isRecording) stopRecording();
+    else startRecording();
+};
+
+function startRecording(){
+    isRecording = true;
+    videoBtn.classList.add('recording');
+    timerEl.style.display = 'block';
+    startTime = Date.now();
+    chunks = [];
+
+    canvasFinal.width = 720;
+    canvasFinal.height = 1280;
+
+    function loop(t){
+        if(!isRecording) return;
+        ctxFinal.clearRect(0,0,720,1280);
+        drawVideo(720,1280);
+        updateFrame(t);
+        drawFrame(720,1280);
+        updateTimer();
+        animId = requestAnimationFrame(loop);
+    }
+    loop();
+
+    const streamCanvas = canvasFinal.captureStream(30);
+    stream.getAudioTracks().forEach(a=>streamCanvas.addTrack(a));
+
+    recorder = new MediaRecorder(streamCanvas,{mimeType:'video/webm'});
+    recorder.ondataavailable = e=>chunks.push(e.data);
+    recorder.onstop = finishVideo;
+    recorder.start();
 }
 
-/* CONVERSÃO MP4 */
-async function convertMP4(){
-  loading.style.display="flex";
-  const {createFFmpeg,fetchFile}=FFmpeg;
-  const ffmpeg=createFFmpeg({log:false});
-  await ffmpeg.load();
-
-  ffmpeg.FS("writeFile","input.webm",await fetchFile(new Blob(chunks)));
-  await ffmpeg.run("-i","input.webm","-movflags","faststart",
-                   "-pix_fmt","yuv420p","-vcodec","libx264","output.mp4");
-  const mp4=ffmpeg.FS("readFile","output.mp4");
-  const url=URL.createObjectURL(new Blob([mp4.buffer],{type:"video/mp4"}));
-
-  previewVideo.src=url;
-  previewVideo.style.display="block";
-  previewImg.style.display="none";
-  preview.style.display="flex";
-  loading.style.display="none";
+function stopRecording(){
+    isRecording = false;
+    cancelAnimationFrame(animId);
+    videoBtn.classList.remove('recording');
+    timerEl.style.display='none';
+    recorder.stop();
 }
 
-/* PREVIEW */
-cancelBtn.onclick=()=>preview.style.display="none";
-saveBtn.onclick=()=>{
-  const a=document.createElement("a");
-  a.href=previewVideo.src||previewImg.src;
-  a.download=previewVideo.src?"video.mp4":"foto.png";
-  a.click();
-  preview.style.display="none";
+function finishVideo(){
+    const blob = new Blob(chunks,{type:'video/webm'});
+    videoPreview.src = URL.createObjectURL(blob);
+    videoPreview.style.display='block';
+    showResult(videoPreview.src,blob);
 }
+
+/* TIMER */
+function updateTimer(){
+    const s = Math.floor((Date.now()-startTime)/1000);
+    timerEl.textContent = `00:${String(s).padStart(2,'0')}`;
+    if(s>=MAX_DURATION) stopRecording();
+}
+
+/* RESULT */
+let currentURL;
+function showResult(url,blob){
+    cameraUI.style.display='none';
+    resultUI.style.display='flex';
+    currentURL = url;
+    downloadBtn.onclick = ()=>{
+        const a=document.createElement('a');
+        a.href=url;
+        a.download = blob ? 'video.webm':'foto.png';
+        a.click();
+    }
+}
+
+newBtn.onclick = ()=>{
+    resultUI.style.display='none';
+    cameraUI.style.display='flex';
+    canvasPreview.style.display='none';
+    videoPreview.style.display='none';
+};
+
+/* SWITCH */
+switchBtn.onclick = ()=>{
+    usingFront = !usingFront;
+    initCamera();
+};
+
+startBtn.onclick = initCamera;
 </script>
 
 </body>
