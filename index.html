@@ -2,303 +2,212 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Câmera 9:16 com Moldura Animada</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Câmera 9:16 Moldura Animada</title>
 
 <style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:none;}
-body{background:#000;overflow:hidden;font-family:Arial,sans-serif;width:100vw;height:100dvh}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:Arial}
 
-/* CAPA */
 #startScreen{
     position:fixed;inset:0;
     background:url("capa.jpg") center/cover no-repeat;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    z-index:50
+    display:flex;justify-content:center;align-items:center;z-index:10
 }
-#startBtn{
-    padding:18px 36px;border-radius:50px;border:none;
-    font-size:20px;cursor:pointer;background:#ff4d00;color:#fff
-}
+#startBtn{padding:18px 36px;border-radius:40px;border:none;font-size:18px}
 
-/* STAGE */
-#stage{position:fixed;inset:0;display:none;background:#000}
-
-/* CAMERA */
 #camera{
-    position:absolute;inset:0;
-    width:100%;height:100%;
-    object-fit:cover;background:#000;
+    position:fixed;inset:0;display:none;background:#000
 }
-#camera.mirror{transform:scaleX(-1)}
+video{width:100%;height:100%;object-fit:cover}
 
-/* GIF AO VIVO */
-#liveFrame{
-    position:absolute;inset:0;
-    width:100%;height:100%;
-    object-fit:cover;
-    pointer-events:none;
-    z-index:5;
+#overlay{
+    position:absolute;inset:0;pointer-events:none
 }
+#overlay img{width:100%;height:100%;object-fit:cover}
 
-/* PREVIEW */
-#canvasPreview,#videoPreview{
-    position:absolute;inset:0;
-    width:100%;height:100%;
-    object-fit:contain;
-    display:none;
-    z-index:10;
-    background:#000;
+.controls{
+    position:absolute;bottom:20px;width:100%;
+    display:flex;justify-content:space-around;z-index:5
+}
+.controls button{
+    width:70px;height:70px;border-radius:50%;border:none;font-size:20px
 }
 
-/* UI */
-.ui{
-    position:absolute;inset:0;
-    z-index:20;
-    display:flex;
-    flex-direction:column;
-    justify-content:space-between;
-    padding:20px;
-    pointer-events:none
+#recordBtn{background:red;position:relative}
+#recordBtn.recording{background:#111}
+#ring{
+    position:absolute;inset:-6px;
+    border:4px solid red;border-top-color:transparent;
+    border-radius:50%;display:none;animation:spin 1s linear infinite
 }
-.top{display:flex;justify-content:space-between;pointer-events:auto}
-.timer{
-    background:red;padding:6px 14px;border-radius:14px;
-    font-weight:bold;display:none
-}
-.bottom{
-    display:flex;justify-content:center;gap:25px;
-    pointer-events:auto
-}
-.btn{
-    width:60px;height:60px;border-radius:50%;
-    border:2px solid #fff;background:rgba(255,255,255,.2);
-    color:#fff;font-size:24px;cursor:pointer
-}
-.btn.recording{background:red}
-.big{width:80px;height:80px;border-width:4px}
+#recordBtn.recording #ring{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-/* RESULT */
-.result{
-    position:absolute;inset:0;
-    z-index:30;
-    display:none;
-    flex-direction:column;
-    justify-content:flex-end;
-    align-items:center;
-    padding:30px;
-    gap:15px;
-    background:#000
+#preview{
+    position:fixed;inset:0;background:#000;display:none;
+    flex-direction:column;justify-content:center;align-items:center
 }
-.result button{
-    width:100%;max-width:280px;padding:14px;
-    font-size:16px;border:none;border-radius:12px;cursor:pointer
-}
-.save{background:#25D366;color:#fff}
-.new{background:#555;color:#fff}
+#preview video,#preview img{max-width:100%;max-height:100%}
+#downloadBtn{margin-top:20px;padding:12px 26px;font-size:16px}
 </style>
 </head>
 
 <body>
 
 <div id="startScreen">
-    <button id="startBtn">INICIAR</button>
+    <button id="startBtn">Iniciar</button>
 </div>
 
-<div id="stage">
-    <video id="camera" autoplay playsinline muted></video>
-    <img id="liveFrame">
+<div id="camera">
+    <video id="video" autoplay muted playsinline></video>
+    <div id="overlay"><img id="frameImg"></div>
 
-    <canvas id="canvasPreview"></canvas>
-    <video id="videoPreview" controls playsinline></video>
-
-    <div class="ui" id="cameraUI">
-        <div class="top">
-            <button class="btn" id="switchBtn">🔄</button>
-            <div class="timer" id="timer">00:00</div>
-        </div>
-        <div class="bottom">
-            <button class="btn" id="photoBtn">📷</button>
-            <button class="btn big" id="videoBtn">🎥</button>
-        </div>
-    </div>
-
-    <div class="result" id="resultUI">
-        <button class="save" id="downloadBtn">📥 Baixar</button>
-        <button class="new" id="newBtn">🔄 Novo</button>
+    <div class="controls">
+        <button id="switchBtn">↺</button>
+        <button id="photoBtn">📸</button>
+        <button id="recordBtn"><div id="ring"></div></button>
     </div>
 </div>
 
+<div id="preview">
+    <video id="videoPreview" controls></video>
+    <img id="imgPreview">
+    <button id="downloadBtn">Salvar</button>
+</div>
+
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js"></script>
 <script>
-/* CONFIG */
+/* ================= CONFIG ================= */
 const TOTAL_FRAMES = 30;
-const FRAME_FPS = 20;
+const FRAME_INTERVAL = 60;
 const MAX_DURATION = 60;
 
-/* ELEMENTOS */
-const startScreen = document.getElementById('startScreen');
-const stage = document.getElementById('stage');
-const video = document.getElementById('camera');
-const liveFrame = document.getElementById('liveFrame');
+/* =============== ELEMENTOS =============== */
+const video = document.getElementById("video");
+const frameImg = document.getElementById("frameImg");
+const recordBtn = document.getElementById("recordBtn");
+const preview = document.getElementById("preview");
+const videoPreview = document.getElementById("videoPreview");
+const imgPreview = document.getElementById("imgPreview");
+const downloadBtn = document.getElementById("downloadBtn");
 
-const canvasPreview = document.getElementById('canvasPreview');
-const ctxPreview = canvasPreview.getContext('2d');
-const videoPreview = document.getElementById('videoPreview');
+/* =============== VARIÁVEIS =============== */
+let stream, recorder, chunks=[];
+let recording=false, timer;
+let frameIndex=0, frames=[];
+let cameraMode="environment";
+let finalURL=null;
 
-const cameraUI = document.getElementById('cameraUI');
-const resultUI = document.getElementById('resultUI');
-const timerEl = document.getElementById('timer');
-
-const photoBtn = document.getElementById('photoBtn');
-const videoBtn = document.getElementById('videoBtn');
-const switchBtn = document.getElementById('switchBtn');
-const downloadBtn = document.getElementById('downloadBtn');
-const newBtn = document.getElementById('newBtn');
-
-/* CANVAS FINAL */
-const canvasFinal = document.createElement('canvas');
-const ctxFinal = canvasFinal.getContext('2d');
-
-/* ESTADO */
-let stream, usingFront=true, isRecording=false;
-let recorder, chunks=[], startTime=0, animId;
-
-/* FRAMES */
-const frames=[];
+/* =============== FRAMES ================== */
 for(let i=1;i<=TOTAL_FRAMES;i++){
     const img=new Image();
     img.src=`assets/frame_${i}.png`;
     frames.push(img);
 }
-let frameIndex=0;
-let lastFrameTime=0;
 
-/* CAMERA */
-async function initCamera(){
+setInterval(()=>{
+    frameIndex=(frameIndex+1)%TOTAL_FRAMES;
+    frameImg.src=frames[frameIndex].src;
+},FRAME_INTERVAL);
+
+/* =============== CAMERA ================== */
+async function startCamera(){
     if(stream) stream.getTracks().forEach(t=>t.stop());
-    stream = await navigator.mediaDevices.getUserMedia({
-        video:{facingMode:usingFront?'user':'environment'},
-        audio:true
+    stream=await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:cameraMode},audio:true
     });
     video.srcObject=stream;
-    video.classList.toggle('mirror',usingFront);
-    video.play();
-    startScreen.style.display='none';
-    stage.style.display='block';
-    animateLiveFrame();
+}
+startBtn.onclick=async()=>{
+    startScreen.style.display="none";
+    camera.style.display="block";
+    await startCamera();
+};
+switchBtn.onclick=async()=>{
+    cameraMode=cameraMode==="environment"?"user":"environment";
+    await startCamera();
+};
+
+/* =============== CANVAS ================== */
+const canvas=document.createElement("canvas");
+canvas.width=1080;canvas.height=1920;
+const ctx=canvas.getContext("2d");
+
+function drawVideo(){
+    const vw=video.videoWidth,vh=video.videoHeight;
+    const r=Math.max(1080/vw,1920/vh);
+    const nw=vw*r,nh=vh*r;
+    ctx.drawImage(video,(1080-nw)/2,(1920-nh)/2,nw,nh);
+}
+function drawFrame(){
+    const img=frames[frameIndex];
+    if(img.complete) ctx.drawImage(img,0,0,1080,1920);
 }
 
-/* ANIMA GIF AO VIVO */
-function animateLiveFrame(t=0){
-    if(t-lastFrameTime>1000/FRAME_FPS){
-        frameIndex=(frameIndex+1)%frames.length;
-        liveFrame.src = frames[frameIndex].src;
-        lastFrameTime=t;
-    }
-    requestAnimationFrame(animateLiveFrame);
-}
-
-/* DRAW VIDEO */
-function drawVideo(w,h){
-    const vw=video.videoWidth, vh=video.videoHeight;
-    if(!vw) return;
-    const r=Math.max(w/vw,h/vh);
-    const nw=vw*r, nh=vh*r;
-    ctxFinal.save();
-    if(usingFront){ctxFinal.translate(w,0);ctxFinal.scale(-1,1);}
-    ctxFinal.drawImage(video,(w-nw)/2,(h-nh)/2,nw,nh);
-    ctxFinal.restore();
-}
-
-/* FOTO */
+/* =============== FOTO ================== */
 photoBtn.onclick=()=>{
-    canvasFinal.width=1080;
-    canvasFinal.height=1920;
-    drawVideo(1080,1920);
-    ctxFinal.drawImage(frames[frameIndex],0,0,1080,1920);
-    canvasPreview.width=innerWidth;
-    canvasPreview.height=innerHeight;
-    ctxPreview.drawImage(canvasFinal,0,0,canvasPreview.width,canvasPreview.height);
-    canvasPreview.style.display='block';
-    showResult(canvasFinal.toDataURL(),"foto.png");
+    ctx.clearRect(0,0,1080,1920);
+    drawVideo();drawFrame();
+    finalURL=canvas.toDataURL("image/png");
+    imgPreview.src=finalURL;
+    imgPreview.style.display="block";
+    videoPreview.style.display="none";
+    preview.style.display="flex";
 };
 
-/* VIDEO */
-videoBtn.onclick=()=>isRecording?stopRecording():startRecording();
+/* =============== VÍDEO ================== */
+recordBtn.onclick=()=>{
+    if(!recording){
+        recording=true;
+        recordBtn.classList.add("recording");
+        chunks=[];
+        const cs=canvas.captureStream(30);
+        stream.getAudioTracks().forEach(t=>cs.addTrack(t));
+        recorder=new MediaRecorder(cs);
+        recorder.ondataavailable=e=>chunks.push(e.data);
+        recorder.onstop=finishVideo;
+        recorder.start();
 
-function startRecording(){
-    isRecording=true;
-    videoBtn.classList.add('recording');
-    timerEl.style.display='block';
-    startTime=Date.now();
-    chunks=[];
-    canvasFinal.width=720;
-    canvasFinal.height=1280;
-
-    function loop(){
-        if(!isRecording) return;
-        ctxFinal.clearRect(0,0,720,1280);
-        drawVideo(720,1280);
-        ctxFinal.drawImage(frames[frameIndex],0,0,720,1280);
-        updateTimer();
-        animId=requestAnimationFrame(loop);
+        let start=Date.now();
+        (function loop(){
+            if(!recording) return;
+            ctx.clearRect(0,0,1080,1920);
+            drawVideo();drawFrame();
+            if((Date.now()-start)/1000>=MAX_DURATION){
+                recordBtn.click();
+                return;
+            }
+            requestAnimationFrame(loop);
+        })();
+    }else{
+        recording=false;
+        recordBtn.classList.remove("recording");
+        recorder.stop();
     }
-    loop();
-
-    const cs=canvasFinal.captureStream(30);
-    stream.getAudioTracks().forEach(a=>cs.addTrack(a));
-    recorder=new MediaRecorder(cs,{mimeType:'video/webm'});
-    recorder.ondataavailable=e=>chunks.push(e.data);
-    recorder.onstop=finishVideo;
-    recorder.start();
-}
-
-function stopRecording(){
-    isRecording=false;
-    cancelAnimationFrame(animId);
-    recorder.stop();
-    videoBtn.classList.remove('recording');
-    timerEl.style.display='none';
-}
-
-function finishVideo(){
-    const blob=new Blob(chunks,{type:'video/webm'});
-    const url=URL.createObjectURL(blob);
-    videoPreview.src=url;
-    videoPreview.style.display='block';
-    showResult(url,"video.webm");
-}
-
-/* TIMER */
-function updateTimer(){
-    const s=Math.floor((Date.now()-startTime)/1000);
-    timerEl.textContent=`00:${String(s).padStart(2,'0')}`;
-    if(s>=MAX_DURATION) stopRecording();
-}
-
-/* RESULT */
-function showResult(url,name){
-    cameraUI.style.display='none';
-    resultUI.style.display='flex';
-    downloadBtn.onclick=()=>{
-        const a=document.createElement('a');
-        a.href=url;a.download=name;a.click();
-    }
-}
-
-newBtn.onclick=()=>{
-    resultUI.style.display='none';
-    cameraUI.style.display='flex';
-    canvasPreview.style.display='none';
-    videoPreview.style.display='none';
 };
 
-switchBtn.onclick=()=>{
-    usingFront=!usingFront;
-    initCamera();
-};
+/* =============== FINAL VIDEO ================== */
+async function finishVideo(){
+    const webm=new Blob(chunks,{type:"video/webm"});
+    const ffmpeg=new FFmpeg();
+    await ffmpeg.load();
+    ffmpeg.writeFile("input.webm",await webm.arrayBuffer());
+    await ffmpeg.exec(["-i","input.webm","-movflags","faststart","-pix_fmt","yuv420p","out.mp4"]);
+    const mp4=await ffmpeg.readFile("out.mp4");
+    finalURL=URL.createObjectURL(new Blob([mp4.buffer],{type:"video/mp4"}));
+    videoPreview.src=finalURL;
+    videoPreview.style.display="block";
+    imgPreview.style.display="none";
+    preview.style.display="flex";
+}
 
-startBtn.onclick=initCamera;
+downloadBtn.onclick=()=>{
+    const a=document.createElement("a");
+    a.href=finalURL;
+    a.download=videoPreview.style.display==="block"?"video.mp4":"foto.png";
+    a.click();
+};
 </script>
 
 </body>
