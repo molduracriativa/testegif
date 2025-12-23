@@ -2,160 +2,215 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Câmera com Moldura Animada PNG</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Filtro com Moldura Animada</title>
 
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  background: #000;
-  overflow: hidden;
+html,body{
+  margin:0;
+  padding:0;
+  width:100%;
+  height:100%;
+  background:#000;
+  overflow:hidden;
+  font-family:Arial, sans-serif;
 }
 
-#stage {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
+.stage{
+  position:relative;
+  width:100vw;
+  height:100vh;
 }
 
-video, canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+video,canvas{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
 }
 
-#controls {
-  position: absolute;
-  bottom: 20px;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  z-index: 10;
+/* CAPA */
+#capa{
+  position:absolute;
+  inset:0;
+  background:url('capa.jpg') center/cover no-repeat;
+  z-index:20;
+  display:flex;
+  justify-content:center;
+  align-items:flex-end;
+  padding-bottom:40px;
 }
 
-button {
-  padding: 14px 24px;
-  border-radius: 30px;
-  border: none;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
+#capa button{
+  padding:14px 26px;
+  border-radius:30px;
+  border:none;
+  font-size:16px;
+  font-weight:bold;
+}
+
+/* UI */
+.ui{
+  position:absolute;
+  inset:0;
+  z-index:10;
+  display:none;
+  flex-direction:column;
+  justify-content:space-between;
+  padding:20px;
+}
+
+.top{
+  display:flex;
+  justify-content:flex-end;
+}
+
+.bottom{
+  display:flex;
+  justify-content:center;
+  gap:20px;
+}
+
+button{
+  padding:12px 20px;
+  border-radius:30px;
+  border:none;
+  font-weight:bold;
 }
 </style>
 </head>
 
 <body>
 
-<div id="stage">
+<div class="stage">
+
   <video id="camera" autoplay muted playsinline></video>
   <canvas id="canvas"></canvas>
 
-  <div id="controls">
-    <button id="startRec">Gravar</button>
-    <button id="stopRec">Parar</button>
+  <!-- UI -->
+  <div class="ui" id="ui">
+    <div class="top">
+      <button id="switch">Trocar câmera</button>
+    </div>
+    <div class="bottom">
+      <button id="photo">Foto</button>
+      <button id="videoBtn">Gravar</button>
+    </div>
   </div>
+
+  <!-- CAPA -->
+  <div id="capa">
+    <button id="startBtn">Iniciar</button>
+  </div>
+
 </div>
 
 <script>
-/* ===== CONFIGURAÇÃO ===== */
+/* CONFIGURAÇÃO */
 const TOTAL_FRAMES = 30;
 const FPS = 15;
-const FRAME_FOLDER = 'assets/frames';
+const FRAME_PATH = 'assets/frames/frame_';
 
-/* ===== ELEMENTOS ===== */
+/* ELEMENTOS */
 const video = document.getElementById('camera');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-/* ===== RESOLUÇÃO FINAL DO VÍDEO ===== */
 canvas.width = 720;
 canvas.height = 1280;
 
-/* ===== CÂMERA ===== */
-let cameraStream;
-navigator.mediaDevices.getUserMedia({
-  video: { facingMode: 'user' },
-  audio: true
-}).then(stream => {
-  cameraStream = stream;
-  video.srcObject = stream;
-});
+let stream;
+let usingFront = true;
 
-/* ===== PRELOAD DOS FRAMES ===== */
+/* PRELOAD FRAMES */
 const frames = [];
-for (let i = 1; i <= TOTAL_FRAMES; i++) {
+for(let i=1;i<=TOTAL_FRAMES;i++){
   const img = new Image();
-  img.src = `${FRAME_FOLDER}/frame_${i}.png`;
+  img.src = FRAME_PATH + i + '.png';
   frames.push(img);
 }
 
-/* ===== LOOP DE RENDER ===== */
+/* CÂMERA */
+async function startCamera(){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  stream = await navigator.mediaDevices.getUserMedia({
+    video:{ facingMode: usingFront ? 'user' : 'environment' },
+    audio:true
+  });
+  video.srcObject = stream;
+}
+
+/* START */
+document.getElementById('startBtn').onclick = async ()=>{
+  await startCamera();
+  document.getElementById('capa').style.display = 'none';
+  document.getElementById('ui').style.display = 'flex';
+};
+
+/* TROCAR CÂMERA */
+document.getElementById('switch').onclick = async ()=>{
+  usingFront = !usingFront;
+  await startCamera();
+};
+
+/* LOOP RENDER */
 let frameIndex = 0;
 let lastTime = 0;
 
-function render(timestamp) {
-  if (timestamp - lastTime > 1000 / FPS) {
+function render(t){
+  if(t - lastTime > 1000 / FPS){
     frameIndex = (frameIndex + 1) % frames.length;
-    lastTime = timestamp;
+    lastTime = t;
   }
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(video,0,0,canvas.width,canvas.height);
 
-  // câmera
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-  // moldura animada
-  const frame = frames[frameIndex];
-  if (frame.complete) {
-    ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+  const f = frames[frameIndex];
+  if(f.complete){
+    ctx.drawImage(f,0,0,canvas.width,canvas.height);
   }
 
   requestAnimationFrame(render);
 }
-
 requestAnimationFrame(render);
 
-/* ===== GRAVAÇÃO ===== */
-let recorder;
-let recordedChunks = [];
-
-document.getElementById('startRec').onclick = () => {
-  const canvasStream = canvas.captureStream(30);
-
-  cameraStream.getAudioTracks().forEach(track => {
-    canvasStream.addTrack(track);
-  });
-
-  recorder = new MediaRecorder(canvasStream, {
-    mimeType: 'video/webm'
-  });
-
-  recordedChunks = [];
-
-  recorder.ondataavailable = e => {
-    if (e.data.size > 0) recordedChunks.push(e.data);
-  };
-
-  recorder.onstop = () => {
-    const blob = new Blob(recordedChunks, { type: 'video/webm' });
-    const url = URL.createObjectURL(blob);
-
+/* FOTO */
+document.getElementById('photo').onclick = ()=>{
+  canvas.toBlob(blob=>{
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'video_com_moldura.webm';
+    a.href = URL.createObjectURL(blob);
+    a.download = 'foto.png';
     a.click();
-  };
-
-  recorder.start();
+  });
 };
 
-document.getElementById('stopRec').onclick = () => {
-  if (recorder && recorder.state !== 'inactive') {
+/* VÍDEO */
+let recorder;
+let chunks = [];
+
+document.getElementById('videoBtn').onclick = ()=>{
+  if(!recorder){
+    const canvasStream = canvas.captureStream(30);
+    stream.getAudioTracks().forEach(t=>canvasStream.addTrack(t));
+
+    recorder = new MediaRecorder(canvasStream,{ mimeType:'video/webm' });
+    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.onstop = ()=>{
+      const blob = new Blob(chunks,{ type:'video/webm' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'video.webm';
+      a.click();
+      chunks = [];
+      recorder = null;
+    };
+    recorder.start();
+    document.getElementById('videoBtn').innerText = 'Parar';
+  }else{
     recorder.stop();
+    document.getElementById('videoBtn').innerText = 'Gravar';
   }
 };
 </script>
