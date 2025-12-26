@@ -2,68 +2,58 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>Animação WebP – Estável</title>
+<title>Sequência WebP – Estável</title>
 <style>
 html,body{
   margin:0;
-  padding:0;
   background:#000;
   width:100%;
   height:100%;
   overflow:hidden;
 }
 canvas{
-  display:block;
   width:100%;
   height:100%;
+  display:block;
 }
-#debug{
+#msg{
   position:fixed;
   bottom:10px;
   left:10px;
   color:#0f0;
-  font-family:monospace;
-  font-size:12px;
+  font:12px monospace;
 }
 </style>
 </head>
 <body>
 
-<canvas id="canvas"></canvas>
-<div id="debug">Carregando frames…</div>
+<canvas id="c"></canvas>
+<div id="msg">Carregando…</div>
 
 <script>
-/* ===== CONFIG ===== */
-const FPS = 12;
 const PATH = 'assets/';
 const PREFIX = 'frame-';
-const EXT1 = 'webp';
-const EXT2 = 'png';
-const MAX = 200;
-/* ================== */
+const EXT = 'webp';
+const MAX = 100;
+const FPS = 12;
 
-const canvas = document.getElementById('canvas');
+const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
-const debug = document.getElementById('debug');
+const msg = document.getElementById('msg');
 
-const frames = [];
-let index = 0;
-let last = 0;
-const interval = 1000 / FPS;
-
-function resize(){
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+addEventListener('resize',()=>{
   canvas.width = innerWidth;
   canvas.height = innerHeight;
-}
-addEventListener('resize', resize);
-resize();
+});
 
-/* ===== LOAD ===== */
+const frames = [];
 let i = 1;
 
-function loadNext(){
+function load(){
   if(i > MAX){
-    finalizeLoad();
+    start();
     return;
   }
 
@@ -75,74 +65,63 @@ function loadNext(){
       frames.push(img);
     }
     i++;
-    loadNext();
+    load();
   };
 
   img.onerror = ()=>{
-    const fb = new Image();
-    fb.onload = ()=>{
-      if(fb.width > 0){
-        frames.push(fb);
-      }
-      i++;
-      loadNext();
-    };
-    fb.onerror = ()=>{
-      i++;
-      loadNext();
-    };
-    fb.src = `${PATH}${PREFIX}${num}.${EXT2}`;
+    i++;
+    load();
   };
 
-  img.src = `${PATH}${PREFIX}${num}.${EXT1}`;
+  img.src = `${PATH}${PREFIX}${num}.${EXT}`;
 }
 
-function finalizeLoad(){
-  debug.innerText = `Frames carregados: ${frames.length}`;
+let idx = 0;
+let last = 0;
+const interval = 1000 / FPS;
 
-  if(frames.length < 1){
-    debug.innerText = 'ERRO: nenhum frame encontrado';
+function loop(t){
+  if(frames.length === 0){
+    msg.innerText = 'ERRO: nenhum frame encontrado';
     return;
   }
 
-  requestAnimationFrame(loop);
-}
-
-/* ===== LOOP ===== */
-function loop(t){
   if(t - last >= interval){
     last = t;
 
-    const img = frames[index];
-    if(img && img.width > 0){
-      ctx.clearRect(0,0,canvas.width,canvas.height);
+    const img = frames[idx];
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-      const s = Math.min(
-        canvas.width / img.width,
-        canvas.height / img.height
-      );
+    const s = Math.min(
+      canvas.width / img.width,
+      canvas.height / img.height
+    );
 
-      const w = img.width * s;
-      const h = img.height * s;
+    const w = img.width * s;
+    const h = img.height * s;
 
-      ctx.drawImage(
-        img,
-        (canvas.width - w)/2,
-        (canvas.height - h)/2,
-        w,h
-      );
+    ctx.drawImage(
+      img,
+      (canvas.width - w)/2,
+      (canvas.height - h)/2,
+      w,h
+    );
 
-      index++;
-      if(index >= frames.length - 1){
-        index = 0;
-      }
+    idx++;
+    if(idx >= frames.length - 1){
+      idx = 0; // loop perfeito
     }
   }
 
   requestAnimationFrame(loop);
 }
 
-loadNext();
+function start(){
+  msg.innerText = `Frames carregados: ${frames.length}`;
+  requestAnimationFrame(loop);
+}
+
+load();
 </script>
 
 </body>
