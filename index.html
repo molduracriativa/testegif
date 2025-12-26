@@ -2,137 +2,147 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>Animação Sequencial WebP</title>
+<title>Animação WebP – Estável</title>
 <style>
-  html,body{
-    margin:0;
-    padding:0;
-    background:#000;
-    width:100%;
-    height:100%;
-    overflow:hidden;
-  }
-  canvas{
-    display:block;
-    width:100%;
-    height:100%;
-  }
+html,body{
+  margin:0;
+  padding:0;
+  background:#000;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+}
+canvas{
+  display:block;
+  width:100%;
+  height:100%;
+}
+#debug{
+  position:fixed;
+  bottom:10px;
+  left:10px;
+  color:#0f0;
+  font-family:monospace;
+  font-size:12px;
+}
 </style>
 </head>
 <body>
 
 <canvas id="canvas"></canvas>
+<div id="debug">Carregando frames…</div>
 
 <script>
-/* ================= CONFIGURAÇÕES ================= */
-const FPS = 30;                // 30 ou 60
-const FRAME_PREFIX = 'frame-'; // frame-001.webp
-const MAX_FRAMES = 999;
+/* ===== CONFIG ===== */
+const FPS = 12;
 const PATH = 'assets/';
-const EXT_PRIMARY = 'webp';
-const EXT_FALLBACK = 'png';
-/* ================================================ */
+const PREFIX = 'frame-';
+const EXT1 = 'webp';
+const EXT2 = 'png';
+const MAX = 200;
+/* ================== */
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+const debug = document.getElementById('debug');
+
 const frames = [];
+let index = 0;
+let last = 0;
+const interval = 1000 / FPS;
 
-let frameIndex = 0;
-let lastTime = 0;
-const frameInterval = 1000 / FPS;
-
-/* ===== AJUSTE DE CANVAS ===== */
 function resize(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
 }
-window.addEventListener('resize', resize);
+addEventListener('resize', resize);
 resize();
 
-/* ===== CARREGAMENTO AUTOMÁTICO ===== */
-function loadFrames(){
-  let i = 1;
+/* ===== LOAD ===== */
+let i = 1;
 
-  function loadNext(){
-    if(i > MAX_FRAMES){
-      start();
-      return;
-    }
+function loadNext(){
+  if(i > MAX){
+    finalizeLoad();
+    return;
+  }
 
-    const index = String(i).padStart(3,'0');
-    const img = new Image();
+  const num = String(i).padStart(3,'0');
+  const img = new Image();
 
-    img.src = `${PATH}${FRAME_PREFIX}${index}.${EXT_PRIMARY}`;
-
-    img.onload = ()=>{
+  img.onload = ()=>{
+    if(img.width > 0){
       frames.push(img);
+    }
+    i++;
+    loadNext();
+  };
+
+  img.onerror = ()=>{
+    const fb = new Image();
+    fb.onload = ()=>{
+      if(fb.width > 0){
+        frames.push(fb);
+      }
       i++;
       loadNext();
     };
-
-    img.onerror = ()=>{
-      // fallback PNG
-      const fallback = new Image();
-      fallback.src = `${PATH}${FRAME_PREFIX}${index}.${EXT_FALLBACK}`;
-
-      fallback.onload = ()=>{
-        frames.push(fallback);
-        i++;
-        loadNext();
-      };
-
-      fallback.onerror = ()=>{
-        // frame inexistente → ignora e segue
-        i++;
-        loadNext();
-      };
+    fb.onerror = ()=>{
+      i++;
+      loadNext();
     };
-  }
+    fb.src = `${PATH}${PREFIX}${num}.${EXT2}`;
+  };
 
-  loadNext();
+  img.src = `${PATH}${PREFIX}${num}.${EXT1}`;
 }
 
-/* ===== LOOP PERFEITO ===== */
-function draw(time){
-  if(frames.length < 2) return;
+function finalizeLoad(){
+  debug.innerText = `Frames carregados: ${frames.length}`;
 
-  if(time - lastTime >= frameInterval){
-    lastTime = time;
+  if(frames.length < 1){
+    debug.innerText = 'ERRO: nenhum frame encontrado';
+    return;
+  }
 
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+  requestAnimationFrame(loop);
+}
 
-    const img = frames[frameIndex];
+/* ===== LOOP ===== */
+function loop(t){
+  if(t - last >= interval){
+    last = t;
 
-    const scale = Math.min(
-      canvas.width / img.width,
-      canvas.height / img.height
-    );
+    const img = frames[index];
+    if(img && img.width > 0){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    const w = img.width * scale;
-    const h = img.height * scale;
-    const x = (canvas.width - w) / 2;
-    const y = (canvas.height - h) / 2;
+      const s = Math.min(
+        canvas.width / img.width,
+        canvas.height / img.height
+      );
 
-    ctx.drawImage(img, x, y, w, h);
+      const w = img.width * s;
+      const h = img.height * s;
 
-    frameIndex++;
+      ctx.drawImage(
+        img,
+        (canvas.width - w)/2,
+        (canvas.height - h)/2,
+        w,h
+      );
 
-    // LOOP PERFEITO REAL
-    if(frameIndex >= frames.length - 1){
-      frameIndex = 0;
+      index++;
+      if(index >= frames.length - 1){
+        index = 0;
+      }
     }
   }
 
-  requestAnimationFrame(draw);
+  requestAnimationFrame(loop);
 }
 
-/* ===== INICIAR ===== */
-function start(){
-  console.log('Frames carregados:', frames.length);
-  requestAnimationFrame(draw);
-}
-
-loadFrames();
+loadNext();
 </script>
 
 </body>
